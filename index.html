@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HWOOD Procurement Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-2: #1e1e1e;
+            --surface-3: #282828;
+            --border: #2a2a2a;
+            --border-light: #363636;
+            --text: #e8e8e8;
+            --text-muted: #888;
+            --text-dim: #555;
+            --accent: #c9a84c;
+            --accent-dim: #a08030;
+            --accent-glow: rgba(201, 168, 76, 0.15);
+            --danger: #e05252;
+            --danger-bg: rgba(224, 82, 82, 0.1);
+            --success: #4caf50;
+            --success-bg: rgba(76, 175, 80, 0.1);
+            --warn: #ff9800;
+            --warn-bg: rgba(255, 152, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+        }
+
+        .logo span { color: var(--accent); }
+
+        .header-subtitle {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 30px;
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 4px;
+            width: fit-content;
+        }
+
+        .tab {
+            padding: 10px 24px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text); }
+        .tab.active {
+            background: var(--accent);
+            color: #000;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.15rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title .badge {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.7rem;
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+        .form-group label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.92rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group input::placeholder { color: var(--text-dim); }
+
+        .form-group.span-2 { grid-column: span 2; }
+
+        /* Venue rows */
+        .venue-row {
+            display: grid;
+            grid-template-columns: 1fr repeat(4, 120px) 40px;
+            gap: 12px;
+            align-items: end;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .venue-row:last-of-type { border-bottom: none; }
+
+        .venue-row input {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.92rem;
+            width: 100%;
+        }
+
+        .venue-row input:focus { outline: none; border-color: var(--accent); }
+
+        .venue-header {
+            display: grid;
+            grid-template-columns: 1fr repeat(4, 120px) 40px;
+            gap: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .venue-header span {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-primary:hover { background: #d4b45a; transform: translateY(-1px); }
+
+        .btn-secondary {
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { border-color: var(--accent); }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .btn-danger:hover { background: var(--danger-bg); }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        /* Results */
+        .results-section { margin-top: 30px; }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-sub {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Tables */
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+
+        .result-table th {
+            text-align: left;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-light);
+            font-weight: 500;
+        }
+
+        .result-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-table tr:last-child td { border-bottom: none; }
+
+        .result-table .highlight { color: var(--accent); font-weight: 600; }
+        .result-table .muted { color: var(--text-muted); }
+
+        /* Stress test */
+        .stress-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.88rem;
+        }
+
+        .stress-row:last-child { border-bottom: none; }
+
+        .stress-day {
+            font-weight: 700;
+            color: var(--accent);
+            min-width: 50px;
+        }
+
+        .stress-bar-container {
+            flex: 1;
+            height: 24px;
+            background: var(--surface-3);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stress-bar {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+            min-width: 2px;
+        }
+
+        .stress-bar.ok { background: var(--success); }
+        .stress-bar.low { background: var(--warn); }
+        .stress-bar.out { background: var(--danger); }
+
+        .stress-stock {
+            min-width: 70px;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .stockout-tag {
+            font-size: 0.72rem;
+            background: var(--danger-bg);
+            color: var(--danger);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .delivery-tag {
+            font-size: 0.72rem;
+            background: var(--success-bg);
+            color: var(--success);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* PO Cards */
+        .po-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .po-dest {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
+        .po-detail { color: var(--text-muted); font-size: 0.85rem; }
+
+        .po-qty {
+            text-align: right;
+        }
+
+        .po-qty .big {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .po-qty .small { color: var(--text-muted); font-size: 0.82rem; }
+
+        /* TCO */
+        .tco-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 10px;
+        }
+
+        .tco-cell {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .tco-cell.target {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .tco-cases { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
+        .tco-price { font-size: 1.1rem; font-weight: 700; }
+        .tco-cell.target .tco-price { color: var(--accent); }
+        .tco-units { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+
+        /* Override section */
+        .override-section {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-top: 16px;
+        }
+
+        .override-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            user-select: none;
+        }
+
+        .override-toggle:hover { color: var(--text); }
+
+        .override-fields {
+            display: grid;
+            grid-template-columns: repeat(2, 200px);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .override-tag {
+            font-size: 0.7rem;
+            background: var(--warn-bg);
+            color: var(--warn);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .mt-20 { margin-top: 20px; }
+        .mb-10 { margin-bottom: 10px; }
+        .text-muted { color: var(--text-muted); }
+        .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+        /* PAR Advisor */
+        /* PAR Advisor — base styles */
+        .par-rec-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        .par-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .par-box {
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .par-box.current {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+        }
+
+        .par-box.ideal {
+            background: rgba(76, 175, 80, 0.08);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .par-box.realistic {
+            background: var(--accent-glow);
+            border: 1px solid rgba(201, 168, 76, 0.4);
+        }
+
+        .par-box-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .par-box.current .par-box-label { color: var(--text-muted); }
+        .par-box.ideal .par-box-label { color: var(--success); }
+        .par-box.realistic .par-box-label { color: var(--accent); }
+
+        .par-box-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        .par-box.current .par-box-value { color: var(--text-muted); }
+        .par-box.ideal .par-box-value { color: var(--success); }
+        .par-box.realistic .par-box-value { color: var(--accent); }
+
+        .par-box-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .par-verdict {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .par-verdict.too-high {
+            background: var(--warn-bg);
+            color: var(--warn);
+            border: 1px solid rgba(255, 152, 0, 0.2);
+        }
+
+        .par-verdict.too-low {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border: 1px solid rgba(224, 82, 82, 0.2);
+        }
+
+        .par-verdict.good {
+            background: var(--success-bg);
+            color: var(--success);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        .par-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .par-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .par-detail-item .label { color: var(--text-muted); }
+        .par-detail-item .value { font-weight: 600; }
+
+        /* Risk Factor Grid */
+        .risk-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .risk-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            gap: 20px;
+        }
+
+        .risk-info { flex: 1; }
+        .risk-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 2px; }
+        .risk-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+        .risk-inputs {
+            display: flex;
+            gap: 12px;
+        }
+
+        .risk-inputs .form-group { width: 100px; }
+
+        .risk-inputs input {
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem;
+            width: 100%;
+        }
+
+        .risk-inputs input:focus { outline: none; border-color: var(--accent); }
+
+        /* Diagnostic Cards */
+        .diag-section {
+            margin-top: 24px;
+        }
+
+        .diag-card {
+            background: var(--surface-2);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            border-left: 3px solid var(--border);
+        }
+
+        .diag-card.critical { border-left-color: var(--danger); }
+        .diag-card.warning { border-left-color: var(--warn); }
+        .diag-card.info { border-left-color: var(--accent); }
+        .diag-card.ok { border-left-color: var(--success); }
+
+        .diag-icon { font-size: 1.3rem; margin-top: 2px; }
+
+        .diag-content { flex: 1; }
+        .diag-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 4px; }
+        .diag-text { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
+        .diag-action {
+            font-size: 0.82rem;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: var(--surface-3);
+            border-radius: 6px;
+            color: var(--text);
+        }
+
+        .diag-action strong { color: var(--accent); }
+
+        /* Depletion timeline */
+        .depletion-timeline {
+            position: relative;
+            padding: 20px 0;
+            margin: 20px 0;
+        }
+
+        .depletion-bar-bg {
+            height: 32px;
+            background: var(--surface-3);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .depletion-bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .depletion-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .depletion-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .depletion-marker .dm-value { font-weight: 600; color: var(--text); }
+
+        /* PAR venue row — wider for new fields */
+        .par-venue-row {
+            display: grid;
+            grid-template-columns: 1fr 100px 100px 130px 90px 100px 100px 40px;
+            gap: 10px;
+            align-items: end;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .par-venue-row:last-of-type { border-bottom: none; }
+
+        .par-venue-row input, .par-venue-row select {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 10px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem;
+            width: 100%;
+        }
+
+        .par-venue-row input:focus, .par-venue-row select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .par-venue-header {
+            display: grid;
+            grid-template-columns: 1fr 100px 100px 130px 90px 100px 100px 40px;
+            gap: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .par-venue-header span {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 500;
+        }
+
+        /* Scenario comparison */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .scenario-card {
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .scenario-card.depletion { background: rgba(76, 175, 80, 0.06); border-color: rgba(76, 175, 80, 0.25); }
+        .scenario-card.risk { background: var(--accent-glow); border-color: rgba(201, 168, 76, 0.35); }
+        .scenario-card.worst { background: rgba(224, 82, 82, 0.06); border-color: rgba(224, 82, 82, 0.2); }
+
+        .scenario-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .scenario-card.depletion .scenario-label { color: var(--success); }
+        .scenario-card.risk .scenario-label { color: var(--accent); }
+        .scenario-card.worst .scenario-label { color: var(--danger); }
+
+        .scenario-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .scenario-card.depletion .scenario-value { color: var(--success); }
+        .scenario-card.risk .scenario-value { color: var(--accent); }
+        .scenario-card.worst .scenario-value { color: var(--danger); }
+
+        .scenario-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 16px 20px; }
+            .container { padding: 20px; }
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            .form-group.span-2 { grid-column: span 2; }
+            .venue-row, .venue-header {
+                grid-template-columns: 1fr repeat(2, 100px) 40px;
+            }
+            .venue-row .hide-mobile, .venue-header .hide-mobile { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">THE <span>h.wood</span> GROUP</div>
+    <div class="header-subtitle">Procurement Engine</div>
+</div>
+
+<div class="container">
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('input')">Setup</button>
+        <button class="tab" onclick="switchTab('results')">Results</button>
+        <button class="tab" onclick="switchTab('orders')">Purchase Orders</button>
+        <button class="tab" onclick="switchTab('par')">PAR Advisor</button>
+    </div>
+
+    <!-- INPUT TAB -->
+    <div id="tab-input">
+        <!-- Item Info -->
+        <div class="card">
+            <div class="card-title">Item Details</div>
+            <div class="form-grid">
+                <div class="form-group span-2">
+                    <label>Item Name</label>
+                    <input type="text" id="item-name" placeholder="e.g. Serving Tong Medium">
+                </div>
+                <div class="form-group">
+                    <label>SKU</label>
+                    <input type="text" id="item-sku" placeholder="e.g. GRM 880071">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="item-category">
+                        <option value="OS&E">OS&E</option>
+                        <option value="Collateral">Collateral</option>
+                        <option value="Other Items">Other Items</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Subcategory</label>
+                    <select id="item-subcategory">
+                        <option value="Glassware - Delicate">Glassware — Delicate</option>
+                        <option value="Glassware - Sturdy">Glassware — Sturdy</option>
+                        <option value="Flatware">Flatware</option>
+                        <option value="Dinnerware">Dinnerware</option>
+                        <option value="Bar Tools">Bar Tools</option>
+                        <option value="Smallwares">Smallwares</option>
+                        <option value="Consumable">Consumable</option>
+                        <option value="Equipment">Equipment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Case / Pack Size</label>
+                    <input type="number" id="item-case-size" placeholder="12" value="12">
+                </div>
+                <div class="form-group">
+                    <label>Unit Cost ($)</label>
+                    <input type="number" id="item-unit-cost" placeholder="Optional" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Shipping Cost ($)</label>
+                    <input type="number" id="item-shipping-cost" placeholder="Optional" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Shipping Type</label>
+                    <select id="item-shipping-type">
+                        <option value="flat">Flat per shipment</option>
+                        <option value="per_case">Per case</option>
+                        <option value="per_unit">Per unit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Supplier Lead Time (days)</label>
+                    <input type="number" id="item-lead-time" placeholder="21" value="21">
+                </div>
+                <div class="form-group span-2">
+                    <label>Supplier Name</label>
+                    <input type="text" id="item-supplier" placeholder="e.g. Charingworth/Studio William">
+                </div>
+                <div class="form-group span-2">
+                    <label>Supplier Contact</label>
+                    <input type="text" id="item-supplier-contact" placeholder="e.g. Sabrina Sandha <sabrina@email.com>">
+                </div>
+            </div>
+        </div>
+
+        <!-- Venues -->
+        <div class="card">
+            <div class="card-title">Venues</div>
+            <div class="venue-header">
+                <span>Venue Name</span>
+                <span>PAR</span>
+                <span>Monthly Demand</span>
+                <span class="hide-mobile">On Hand</span>
+                <span class="hide-mobile">Trigger (mo)</span>
+                <span></span>
+            </div>
+            <div id="venue-list"></div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="addVenue()">+ Add Venue</button>
+            </div>
+        </div>
+
+        <!-- Warehouse -->
+        <div class="card">
+            <div class="card-title">Warehouse Configuration</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Max Simultaneous Venues</label>
+                    <input type="number" id="wh-max-simul" value="2" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Review Period (days)</label>
+                    <input type="number" id="wh-review" value="7" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Current On Hand</label>
+                    <input type="number" id="wh-on-hand" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Current On PO</label>
+                    <input type="number" id="wh-on-po" value="0" min="0">
+                </div>
+            </div>
+
+            <div class="override-section">
+                <label class="override-toggle">
+                    <input type="checkbox" id="override-check" onchange="toggleOverride()">
+                    Manual Override (s, S)
+                </label>
+                <div id="override-fields" class="override-fields hidden">
+                    <div class="form-group">
+                        <label>s (Reorder Point)</label>
+                        <input type="number" id="override-s" placeholder="e.g. 24">
+                    </div>
+                    <div class="form-group">
+                        <label>S (Order-Up-To)</label>
+                        <input type="number" id="override-S" placeholder="e.g. 36">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TCO Target -->
+        <div class="card">
+            <div class="card-title">TCO Target <span class="badge">Optional</span></div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Target TCO per unit ($)</label>
+                    <input type="number" id="tco-target" placeholder="e.g. 7.00" step="0.01">
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="runEngine()" style="padding: 14px 40px; font-size: 1rem;">
+            ▶ Run Procurement Engine
+        </button>
+    </div>
+
+    <!-- RESULTS TAB -->
+    <div id="tab-results" class="hidden">
+        <div id="results-content"></div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div id="tab-orders" class="hidden">
+        <div id="orders-content"></div>
+    </div>
+
+    <!-- PAR ADVISOR TAB -->
+    <div id="tab-par" class="hidden">
+        <div class="card">
+            <div class="card-title">PAR Advisor <span class="badge">Depletion-Based Diagnostic</span></div>
+            <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:20px">
+                Enter what you know about the venue's actual behavior — the system will calculate suggested PARs and diagnose the root cause of inventory problems.
+            </p>
+
+            <div id="par-venue-list"></div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="addParVenue()">+ Add Venue</button>
+            </div>
+        </div>
+
+        <!-- Risk Factors -->
+        <div class="card">
+            <div class="card-title">Risk Factors</div>
+
+            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:8px">Venue Risks — Factored into venue PAR</div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                These happen at the venue and the warehouse can't prevent them.
+            </p>
+            <div class="risk-grid">
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Breakage / Loss Spike</div>
+                        <div class="risk-desc">Bad weekend, new staff, big event — abnormal loss at the venue</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group">
+                            <label>Extra Days</label>
+                            <input type="number" id="risk-breakage-days" value="7" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Likelihood %</label>
+                            <input type="number" id="risk-breakage-pct" value="30" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Venue Ordering Delay</div>
+                        <div class="risk-desc">Manager forgets to submit order, internal approval slow, miscounts</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group">
+                            <label>Extra Days</label>
+                            <input type="number" id="risk-venue-order-days" value="3" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Likelihood %</label>
+                            <input type="number" id="risk-venue-order-pct" value="50" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:24px">Warehouse Risks — Handled by warehouse s/S system</div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                These are absorbed by the warehouse. The warehouse stays stocked so venues don't have to carry this buffer. Shown here for reference — not added to venue PAR.
+            </p>
+            <div class="risk-grid">
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Supplier Delay</div>
+                        <div class="risk-desc">Shipment to warehouse arrives later than quoted lead time</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group">
+                            <label>Extra Days</label>
+                            <input type="number" id="risk-supplier-days" value="7" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Likelihood %</label>
+                            <input type="number" id="risk-supplier-pct" value="60" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Payment / PO Hold</div>
+                        <div class="risk-desc">Supplier holds shipment due to late payment or approval delays</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group">
+                            <label>Extra Days</label>
+                            <input type="number" id="risk-payment-days" value="10" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Likelihood %</label>
+                            <input type="number" id="risk-payment-pct" value="30" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Warehouse Stockout</div>
+                        <div class="risk-desc">Warehouse is low/empty when venue orders, adding delay</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group">
+                            <label>Extra Days</label>
+                            <input type="number" id="risk-warehouse-days" value="7" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Likelihood %</label>
+                            <input type="number" id="risk-warehouse-pct" value="40" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Item Config -->
+        <div class="card">
+            <div class="card-title">Item Configuration</div>
+            <div class="form-grid" style="max-width:600px">
+                <div class="form-group">
+                    <label>Item Category</label>
+                    <select id="par-category">
+                        <option value="Glassware - Delicate">Glassware — Delicate (10%)</option>
+                        <option value="Glassware - Sturdy">Glassware — Sturdy (7%)</option>
+                        <option value="Flatware">Flatware (4%)</option>
+                        <option value="Dinnerware">Dinnerware (3%)</option>
+                        <option value="Bar Tools">Bar Tools (2.5%)</option>
+                        <option value="Smallwares">Smallwares (2%)</option>
+                        <option value="Consumable">Consumable (usage-based)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Case / Pack Size</label>
+                    <input type="number" id="par-case-size" value="12" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Supplier Lead Time (days)</label>
+                    <input type="number" id="par-lead-time" value="21" min="1">
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="runParAdvisor()" style="padding:14px 40px;font-size:1rem">
+            ▶ Run PAR Diagnostic
+        </button>
+
+        <div id="par-results"></div>
+    </div>
+</div>
+
+<script>
+// ─── State ───
+let venueCount = 0;
+let lastReport = null;
+
+// ─── Venue Management ───
+function addVenue(name = '', par = '', demand = '', onHand = '0', trigger = '2.5') {
+    venueCount++;
+    const id = venueCount;
+    const row = document.createElement('div');
+    row.className = 'venue-row';
+    row.id = `venue-${id}`;
+    row.innerHTML = `
+        <input type="text" placeholder="e.g. Delilah LA" value="${name}" data-field="name">
+        <input type="number" placeholder="120" value="${par}" data-field="par" min="1">
+        <input type="number" placeholder="20" value="${demand}" data-field="demand" min="0" step="0.1">
+        <input type="number" placeholder="0" value="${onHand}" data-field="onhand" min="0" class="hide-mobile">
+        <input type="number" placeholder="2.5" value="${trigger}" data-field="trigger" min="0" step="0.5" class="hide-mobile">
+        <button class="btn btn-danger" onclick="removeVenue(${id})">×</button>
+    `;
+    document.getElementById('venue-list').appendChild(row);
+}
+
+function removeVenue(id) {
+    const el = document.getElementById(`venue-${id}`);
+    if (el) el.remove();
+}
+
+function toggleOverride() {
+    const show = document.getElementById('override-check').checked;
+    document.getElementById('override-fields').classList.toggle('hidden', !show);
+}
+
+// ─── Tab Switching ───
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+    document.getElementById(`tab-${tab}`).classList.remove('hidden');
+    if (typeof event !== 'undefined' && event && event.target) {
+        event.target.classList.add('active');
+    }
+}
+
+// ─── Engine Constants ───
+const ATTRITION = {
+    'Glassware - Delicate': 0.10,
+    'Glassware - Sturdy': 0.07,
+    'Flatware': 0.04,
+    'Dinnerware': 0.03,
+    'Bar Tools': 0.025,
+    'Smallwares': 0.02,
+};
+
+const BUFFER_WH = { FAST: 7, MED: 14, SLOW: 7 };
+const BUFFER_VN = { FAST: 3, MED: 5, SLOW: 3 };
+
+function velocity(avgMonthly) {
+    if (avgMonthly > 15) return 'FAST';
+    if (avgMonthly > 5) return 'MED';
+    return 'SLOW';
+}
+
+function roundToCase(units, caseSize) {
+    if (units <= 0) return 0;
+    return Math.ceil(units / caseSize) * caseSize;
+}
+
+// ─── Core Engine ───
+function runEngine() {
+    // Read item
+    const item = {
+        name: val('item-name') || 'Unnamed Item',
+        sku: val('item-sku') || '',
+        category: val('item-category'),
+        subcategory: val('item-subcategory'),
+        caseSize: num('item-case-size') || 12,
+        unitCost: numOrNull('item-unit-cost'),
+        shippingCost: numOrNull('item-shipping-cost'),
+        shippingType: val('item-shipping-type'),
+        leadTime: num('item-lead-time') || 21,
+        supplier: val('item-supplier') || '',
+        supplierContact: val('item-supplier-contact') || '',
+    };
+
+    // Read venues
+    const venueRows = document.querySelectorAll('.venue-row');
+    const venues = [];
+    venueRows.forEach(row => {
+        const name = row.querySelector('[data-field="name"]').value;
+        const par = parseFloat(row.querySelector('[data-field="par"]').value) || 0;
+        const demand = parseFloat(row.querySelector('[data-field="demand"]').value) || 0;
+        const onHand = parseFloat(row.querySelector('[data-field="onhand"]')?.value) || 0;
+        const trigger = parseFloat(row.querySelector('[data-field="trigger"]')?.value) || 2.5;
+        if (name && par > 0) {
+            venues.push({ name, par, monthlyDemand: demand, onHand, triggerMonths: trigger });
+        }
+    });
+
+    if (venues.length === 0) {
+        alert('Add at least one venue with a name and PAR.');
+        return;
+    }
+
+    // Read warehouse
+    const wh = {
+        maxSimul: num('wh-max-simul') || 2,
+        review: num('wh-review') || 7,
+        onHand: num('wh-on-hand') || 0,
+        onPO: num('wh-on-po') || 0,
+    };
+
+    const useOverride = document.getElementById('override-check').checked;
+    const overrideS_small = useOverride ? numOrNull('override-s') : null;
+    const overrideS_big = useOverride ? numOrNull('override-S') : null;
+
+    const tcoTarget = numOrNull('tco-target');
+
+    // ── Calculate venues ──
+    let totalMonthly = 0;
+    const venueResults = venues.map(v => {
+        const daily = v.monthlyDemand / 30;
+        const vel = velocity(v.monthlyDemand);
+        const buffer = BUFFER_VN[vel];
+        const ss = Math.max(1, Math.ceil(daily * buffer));
+
+        const rawMin = Math.ceil(v.monthlyDemand * v.triggerMonths);
+        const minR = Math.max(1, Math.min(rawMin, v.par - 1));
+        const maxS = v.par;
+        const orderQty = Math.max(0, maxS - minR);
+        const typicalDraw = Math.ceil(v.monthlyDemand);
+
+        const needNow = Math.max(0, v.par - v.onHand);
+        const needNowCases = needNow > 0 ? roundToCase(needNow, item.caseSize) : 0;
+
+        totalMonthly += v.monthlyDemand;
+
+        return {
+            ...v, daily, vel, ss, minR, maxS, orderQty, typicalDraw,
+            needNow, needNowCases,
+            needNowPacks: needNowCases / item.caseSize,
+        };
+    });
+
+    // ── Calculate warehouse ──
+    const combinedDaily = totalMonthly / 30;
+    const whVel = velocity(totalMonthly);
+    const whBuffer = BUFFER_WH[whVel];
+    const whSS = Math.max(1, Math.ceil(combinedDaily * whBuffer));
+
+    const typicalDraws = venueResults.map(v => v.typicalDraw).sort((a, b) => b - a);
+    const simulDraw = typicalDraws.slice(0, wh.maxSimul).reduce((a, b) => a + b, 0);
+
+    const ltReviewDemand = Math.ceil(combinedDaily * (item.leadTime + wh.review));
+    let formulaS_small = ltReviewDemand + whSS;
+    let formulaS_big = roundToCase(
+        formulaS_small + Math.max(simulDraw, Math.ceil(combinedDaily * wh.review)),
+        item.caseSize
+    );
+
+    let s = overrideS_small !== null ? overrideS_small : formulaS_small;
+    let S = overrideS_big !== null ? overrideS_big : formulaS_big;
+    const overridden = overrideS_small !== null || overrideS_big !== null;
+
+    const reorderQty = roundToCase(Math.max(item.caseSize, S - s), item.caseSize);
+
+    const currentPos = wh.onHand + wh.onPO;
+    const whNeed = Math.max(0, S - currentPos);
+    const whNeedCases = roundToCase(whNeed, item.caseSize);
+
+    // ── Stress Test ──
+    const stressTest = [];
+    let stock = s;
+    stressTest.push({ day: 0, event: `Warehouse at s (${s}), PO placed`, stock, type: 'start' });
+
+    let day = 0;
+    let wave = 0;
+    while (day < item.leadTime) {
+        day += wh.review;
+        wave++;
+        if (day <= item.leadTime) {
+            stock -= simulDraw;
+            stressTest.push({
+                day,
+                event: `Wave ${wave}: ${wh.maxSimul} venue(s) order (${simulDraw} out)`,
+                stock: Math.max(0, stock),
+                stockout: stock < 0,
+                type: 'draw',
+            });
+        }
+    }
+    stock += reorderQty;
+    stressTest.push({
+        day: item.leadTime,
+        event: `Supplier delivery (+${reorderQty})`,
+        stock,
+        type: 'delivery',
+    });
+
+    // ── TCO Table ──
+    let tcoTable = null;
+    let tcoResult = null;
+    if (item.unitCost !== null && item.shippingCost !== null) {
+        tcoTable = [1, 2, 3, 5, 8, 10, 11, 12, 15, 20].map(cases => {
+            const units = cases * item.caseSize;
+            const productCost = units * item.unitCost;
+            let shipping;
+            if (item.shippingType === 'flat') shipping = item.shippingCost;
+            else if (item.shippingType === 'per_case') shipping = item.shippingCost * cases;
+            else shipping = item.shippingCost * units;
+
+            return {
+                cases, units, productCost,
+                shipping, total: productCost + shipping,
+                tcoPerUnit: (productCost + shipping) / units,
+            };
+        });
+
+        if (tcoTarget && item.shippingType === 'flat' && tcoTarget > item.unitCost) {
+            const minQty = Math.ceil(item.shippingCost / (tcoTarget - item.unitCost));
+            const minCases = Math.ceil(minQty / item.caseSize);
+            const actualQty = minCases * item.caseSize;
+            const actualTCO = (actualQty * item.unitCost + item.shippingCost) / actualQty;
+            tcoResult = { target: tcoTarget, minQty, minCases, actualQty, actualTCO };
+        }
+    }
+
+    // ── First Order ──
+    const totalVenueNeed = venueResults.reduce((a, v) => a + v.needNowCases, 0);
+    const totalFirstOrder = totalVenueNeed + whNeedCases;
+
+    // ── Build Report ──
+    lastReport = {
+        item, venues: venueResults,
+        warehouse: {
+            totalMonthly, combinedDaily, vel: whVel, ss: whSS,
+            maxSimul: wh.maxSimul, simulDraw, review: wh.review,
+            s, S, formulaS_small, formulaS_big, overridden,
+            reorderQty, reorderQtyCases: reorderQty / item.caseSize,
+            onHand: wh.onHand, onPO: wh.onPO,
+            whNeed: whNeedCases, whNeedCases: whNeedCases / item.caseSize,
+        },
+        firstOrder: {
+            venueUnits: totalVenueNeed,
+            venueCases: totalVenueNeed / item.caseSize,
+            whUnits: whNeedCases,
+            whCases: whNeedCases / item.caseSize,
+            totalUnits: totalFirstOrder,
+            totalCases: totalFirstOrder / item.caseSize,
+            totalCost: item.unitCost ? totalFirstOrder * item.unitCost : null,
+        },
+        stressTest, tcoTable, tcoResult,
+    };
+
+    renderResults();
+    renderOrders();
+    switchTab('results');
+    document.querySelector('.tab:nth-child(2)').classList.add('active');
+    document.querySelector('.tab:nth-child(1)').classList.remove('active');
+}
+
+// ─── Render Results ───
+function renderResults() {
+    const r = lastReport;
+    const wh = r.warehouse;
+    const fo = r.firstOrder;
+    let html = '';
+
+    // Summary stats
+    html += `<div class="result-grid">
+        <div class="stat-card">
+            <div class="stat-label">Warehouse s (Reorder Point)</div>
+            <div class="stat-value">${wh.s}</div>
+            <div class="stat-sub">${wh.overridden ? '<span class="override-tag">OVERRIDE</span> Formula: ' + wh.formulaS_small : 'units'}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Warehouse S (Order-Up-To)</div>
+            <div class="stat-value">${wh.S}</div>
+            <div class="stat-sub">${wh.S / r.item.caseSize} cases ${wh.overridden ? '<span class="override-tag">OVERRIDE</span> Formula: ' + wh.formulaS_big : ''}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Reorder Quantity</div>
+            <div class="stat-value">${wh.reorderQty}</div>
+            <div class="stat-sub">${wh.reorderQtyCases} case(s) of ${r.item.caseSize}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">First Order Total</div>
+            <div class="stat-value">${fo.totalUnits}</div>
+            <div class="stat-sub">${fo.totalCases} cases${fo.totalCost ? ' · $' + fo.totalCost.toFixed(2) : ''}</div>
+        </div>
+    </div>`;
+
+    // Venue breakdown
+    html += `<div class="card">
+        <div class="card-title">Venue Breakdown</div>
+        <table class="result-table">
+            <tr>
+                <th>Venue</th>
+                <th>PAR</th>
+                <th>Monthly</th>
+                <th>Velocity</th>
+                <th>Min (r)</th>
+                <th>Max (S)</th>
+                <th>On Hand</th>
+                <th>Need Now</th>
+            </tr>
+            ${r.venues.map(v => `
+            <tr>
+                <td><strong>${v.name}</strong></td>
+                <td>${v.par}</td>
+                <td>${v.monthlyDemand}</td>
+                <td class="muted">${v.vel}</td>
+                <td>${v.minR} <span class="muted">(${v.triggerMonths}mo)</span></td>
+                <td class="highlight">${v.maxS}</td>
+                <td>${v.onHand}</td>
+                <td class="highlight">${v.needNowCases} <span class="muted">(${v.needNowPacks}pk)</span></td>
+            </tr>
+            `).join('')}
+        </table>
+    </div>`;
+
+    // Warehouse details
+    html += `<div class="card">
+        <div class="card-title">Warehouse System</div>
+        <table class="result-table">
+            <tr><td class="muted">Combined Monthly Demand</td><td class="highlight">${wh.totalMonthly.toFixed(1)}</td></tr>
+            <tr><td class="muted">Combined Daily Demand</td><td>${wh.combinedDaily.toFixed(2)}</td></tr>
+            <tr><td class="muted">Velocity</td><td>${wh.vel}</td></tr>
+            <tr><td class="muted">Safety Stock</td><td>${wh.ss}</td></tr>
+            <tr><td class="muted">Max Simultaneous Venues</td><td>${wh.maxSimul} → draw of ${wh.simulDraw} units</td></tr>
+            <tr><td class="muted">Review Period</td><td>Every ${wh.review} days</td></tr>
+            <tr><td class="muted">Trigger Rule</td><td>Weekly check → if stock ≤ ${wh.s} → order ${wh.reorderQty} (${wh.reorderQtyCases} case${wh.reorderQtyCases > 1 ? 's' : ''})</td></tr>
+        </table>
+    </div>`;
+
+    // Stress Test
+    const maxStock = Math.max(...r.stressTest.map(e => e.stock), wh.S);
+    html += `<div class="card">
+        <div class="card-title">Stress Test <span class="badge">Worst Case from s</span></div>
+        ${r.stressTest.map(e => {
+            const pct = maxStock > 0 ? Math.max(0, (e.stock / maxStock) * 100) : 0;
+            const barClass = e.stockout ? 'out' : (e.stock < wh.ss ? 'low' : 'ok');
+            const tag = e.stockout ? '<span class="stockout-tag">STOCKOUT</span>' :
+                        e.type === 'delivery' ? '<span class="delivery-tag">DELIVERED</span>' : '';
+            return `
+            <div class="stress-row">
+                <div class="stress-day">Day ${e.day}</div>
+                <div style="flex:2;font-size:0.84rem;color:var(--text-muted)">${e.event}</div>
+                <div class="stress-bar-container">
+                    <div class="stress-bar ${barClass}" style="width:${pct}%"></div>
+                </div>
+                <div class="stress-stock">${e.stock} units ${tag}</div>
+            </div>`;
+        }).join('')}
+    </div>`;
+
+    // TCO
+    if (r.tcoTable) {
+        html += `<div class="card">
+            <div class="card-title">TCO by Order Size</div>
+            ${r.tcoResult ? `<p style="margin-bottom:16px;color:var(--text-muted);font-size:0.88rem">
+                Target: <strong style="color:var(--accent)">$${r.tcoResult.target}/unit</strong> →
+                Min order: <strong>${r.tcoResult.minCases} cases (${r.tcoResult.actualQty} units)</strong> →
+                Actual TCO: <strong style="color:var(--accent)">$${r.tcoResult.actualTCO.toFixed(2)}/unit</strong>
+            </p>` : ''}
+            <div class="tco-grid">
+                ${r.tcoTable.map(t => {
+                    const isTarget = r.tcoResult && t.cases === r.tcoResult.minCases;
+                    return `
+                    <div class="tco-cell ${isTarget ? 'target' : ''}">
+                        <div class="tco-cases">${t.cases} case${t.cases > 1 ? 's' : ''}</div>
+                        <div class="tco-price">$${t.tcoPerUnit.toFixed(2)}</div>
+                        <div class="tco-units">${t.units} units</div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('results-content').innerHTML = html;
+}
+
+// ─── Render Orders ───
+function renderOrders() {
+    const r = lastReport;
+    let html = `<div class="card"><div class="card-title">Purchase Orders — ${r.item.name}</div>
+        <p class="text-muted mb-10" style="font-size:0.85rem">Supplier: ${r.item.supplier || 'Not specified'} ${r.item.supplierContact ? '· ' + r.item.supplierContact : ''}</p>
+        <div style="display:flex;flex-direction:column;gap:12px">`;
+
+    let poNum = 1;
+    let totalUnits = 0;
+    let totalCases = 0;
+
+    r.venues.forEach(v => {
+        if (v.needNowCases > 0) {
+            html += `<div class="po-card">
+                <div>
+                    <div class="po-dest">PO #${poNum++}: ${v.name}</div>
+                    <div class="po-detail">${r.item.name} (${r.item.sku}) · PAR stock-up (PAR=${v.par})</div>
+                </div>
+                <div class="po-qty">
+                    <div class="big">${v.needNowCases}</div>
+                    <div class="small">${v.needNowPacks} pack(s) of ${r.item.caseSize}</div>
+                </div>
+            </div>`;
+            totalUnits += v.needNowCases;
+            totalCases += v.needNowPacks;
+        }
+    });
+
+    if (r.warehouse.whNeed > 0) {
+        html += `<div class="po-card">
+            <div>
+                <div class="po-dest">PO #${poNum++}: Warehouse</div>
+                <div class="po-detail">${r.item.name} (${r.item.sku}) · Buffer (S=${r.warehouse.S})</div>
+            </div>
+            <div class="po-qty">
+                <div class="big">${r.warehouse.whNeed}</div>
+                <div class="small">${r.warehouse.whNeedCases} pack(s) of ${r.item.caseSize}</div>
+            </div>
+        </div>`;
+        totalUnits += r.warehouse.whNeed;
+        totalCases += r.warehouse.whNeedCases;
+    }
+
+    html += `</div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <strong>TOTAL: ${totalUnits} units (${totalCases} cases)</strong>
+                ${r.firstOrder.totalCost ? `<span class="text-muted"> · Est. $${r.firstOrder.totalCost.toFixed(2)}</span>` : ''}
+            </div>
+        </div>
+    </div>`;
+
+    document.getElementById('orders-content').innerHTML = html;
+}
+
+// ─── Helpers ───
+function val(id) { return document.getElementById(id).value.trim(); }
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function numOrNull(id) {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : parseFloat(v);
+}
+
+// ─── Init with empty venue row ───
+addVenue();
+
+// ─── PAR Advisor ───
+let parVenueCount = 0;
+
+function addParVenue(name='', currentPar='', demand='', orderFreq='every_2_months', lateDays='14', lowPoint='', status='running_ok') {
+    parVenueCount++;
+    const id = parVenueCount;
+
+    if (document.querySelectorAll('.par-venue-row').length === 0) {
+        const header = document.createElement('div');
+        header.className = 'par-venue-header';
+        header.id = 'par-venue-header';
+        header.innerHTML = `
+            <span>Venue Name</span>
+            <span>Current PAR</span>
+            <span>Monthly Usage</span>
+            <span>Order Freq</span>
+            <span>Late By (d)</span>
+            <span>Low Point</span>
+            <span>Status</span>
+            <span></span>
+        `;
+        document.getElementById('par-venue-list').appendChild(header);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'par-venue-row';
+    row.id = `par-venue-${id}`;
+    row.innerHTML = `
+        <input type="text" placeholder="e.g. Delilah LA" value="${name}" data-field="name">
+        <input type="number" placeholder="300" value="${currentPar}" data-field="currentPar" min="0">
+        <input type="number" placeholder="84" value="${demand}" data-field="demand" min="0" step="0.1">
+        <select data-field="orderFreq">
+            <option value="every_month" ${orderFreq==='every_month'?'selected':''}>Monthly</option>
+            <option value="every_2_months" ${orderFreq==='every_2_months'?'selected':''}>Every 2mo</option>
+            <option value="every_3_months" ${orderFreq==='every_3_months'?'selected':''}>Every 3mo</option>
+            <option value="every_4_months" ${orderFreq==='every_4_months'?'selected':''}>Every 4mo</option>
+            <option value="every_6_months" ${orderFreq==='every_6_months'?'selected':''}>Every 6mo</option>
+        </select>
+        <input type="number" placeholder="30" value="${lateDays}" data-field="lateDays" min="0">
+        <input type="number" placeholder="50" value="${lowPoint}" data-field="lowPoint" min="0">
+        <select data-field="status">
+            <option value="running_low" ${status==='running_low'?'selected':''}>Running low</option>
+            <option value="running_ok" ${status==='running_ok'?'selected':''}>Running OK</option>
+            <option value="too_much" ${status==='too_much'?'selected':''}>Too much stock</option>
+        </select>
+        <button class="btn btn-danger" onclick="removeParVenue(${id})">×</button>
+    `;
+    document.getElementById('par-venue-list').appendChild(row);
+}
+
+function removeParVenue(id) {
+    const el = document.getElementById(`par-venue-${id}`);
+    if (el) el.remove();
+    if (document.querySelectorAll('.par-venue-row').length === 0) {
+        const hdr = document.getElementById('par-venue-header');
+        if (hdr) hdr.remove();
+    }
+}
+
+function runParAdvisor() {
+    const category = document.getElementById('par-category').value;
+    const caseSize = parseInt(document.getElementById('par-case-size').value) || 12;
+    const supplierLT = parseInt(document.getElementById('par-lead-time').value) || 21;
+    const attritionRate = ATTRITION[category] || 0;
+
+    // Read risk factors — only VENUE risks go into venue PAR
+    const venueRisks = [
+        { name: 'Breakage Spike', days: num('risk-breakage-days'), pct: num('risk-breakage-pct') / 100 },
+        { name: 'Venue Ordering Delay', days: num('risk-venue-order-days'), pct: num('risk-venue-order-pct') / 100 },
+    ];
+
+    // Warehouse risks — for reference display, NOT added to venue PAR
+    const warehouseRisks = [
+        { name: 'Supplier Delay', days: num('risk-supplier-days'), pct: num('risk-supplier-pct') / 100 },
+        { name: 'Payment / PO Hold', days: num('risk-payment-days'), pct: num('risk-payment-pct') / 100 },
+        { name: 'Warehouse Stockout', days: num('risk-warehouse-days'), pct: num('risk-warehouse-pct') / 100 },
+    ];
+
+    const freqMonths = {
+        'every_month': 1, 'every_2_months': 2, 'every_3_months': 3,
+        'every_4_months': 4, 'every_6_months': 6,
+    };
+    const freqLabels = {
+        'every_month': 'Monthly', 'every_2_months': 'Every 2 months',
+        'every_3_months': 'Quarterly', 'every_4_months': 'Every 4 months',
+        'every_6_months': 'Every 6 months',
+    };
+
+    const rows = document.querySelectorAll('.par-venue-row');
+    const venues = [];
+    rows.forEach(row => {
+        const name = row.querySelector('[data-field="name"]').value.trim();
+        const currentPar = parseFloat(row.querySelector('[data-field="currentPar"]').value) || 0;
+        const demand = parseFloat(row.querySelector('[data-field="demand"]').value) || 0;
+        const orderFreq = row.querySelector('[data-field="orderFreq"]').value;
+        const lateDays = parseFloat(row.querySelector('[data-field="lateDays"]').value) || 0;
+        const lowPoint = parseFloat(row.querySelector('[data-field="lowPoint"]').value) || 0;
+        const status = row.querySelector('[data-field="status"]').value;
+        if (name) venues.push({ name, currentPar, demand, orderFreq, lateDays, lowPoint, status });
+    });
+
+    if (venues.length === 0) { alert('Add at least one venue.'); return; }
+
+    let html = '';
+
+    venues.forEach(v => {
+        const months = freqMonths[v.orderFreq];
+        const realCycleDays = months * 30 + v.lateDays; // actual days between orders
+
+        // ── Reverse-engineer real demand from depletion ──
+        let realMonthly = v.demand; // default to their estimate
+        let demandSource = 'estimate';
+        let estimateVsReal = 0;
+
+        if (v.currentPar > 0 && v.lowPoint > 0 && v.lowPoint < v.currentPar) {
+            const consumed = v.currentPar - v.lowPoint;
+            const realDaily = consumed / realCycleDays;
+            realMonthly = Math.round(realDaily * 30 * 10) / 10;
+            demandSource = 'depletion';
+            estimateVsReal = v.demand > 0 ? Math.round((1 - v.demand / realMonthly) * 100) : 0;
+        }
+
+        const daily = realMonthly / 30;
+        const vel = velocity(realMonthly);
+
+        // ── Floor stock: 1 week of peak (2.5× average) ──
+        const peakDaily = daily * 2.5;
+        const floorStock = Math.ceil(peakDaily * 7);
+
+        // ── Depletion PAR: consumption over real cycle + floor stock ──
+        const cycleConsumption = Math.ceil(daily * realCycleDays);
+        const depletionPar = roundToCase(cycleConsumption + floorStock, caseSize);
+
+        // ── Risk-adjusted PAR (VENUE risks only) ──
+        let weightedRiskDays = 0;
+        const riskBreakdown = [];
+        venueRisks.forEach(r => {
+            const weighted = Math.ceil(daily * r.days * r.pct);
+            weightedRiskDays += daily * r.days * r.pct;
+            riskBreakdown.push({ ...r, units: Math.ceil(daily * r.days), weighted });
+        });
+        const riskBuffer = Math.ceil(weightedRiskDays);
+        const riskPar = roundToCase(cycleConsumption + floorStock + riskBuffer, caseSize);
+
+        // ── Warehouse risk buffer (for display only — goes into warehouse s/S, NOT venue PAR) ──
+        let whWeightedDays = 0;
+        const whRiskBreakdown = [];
+        warehouseRisks.forEach(r => {
+            const weighted = Math.ceil(daily * r.days * r.pct);
+            whWeightedDays += daily * r.days * r.pct;
+            whRiskBreakdown.push({ ...r, units: Math.ceil(daily * r.days), weighted });
+        });
+        const whRiskBuffer = Math.ceil(whWeightedDays);
+
+        // ── Worst case PAR (venue risks at 100%) ──
+        const worstRiskUnits = venueRisks.reduce((sum, r) => sum + Math.ceil(daily * r.days), 0);
+        const worstPar = roundToCase(cycleConsumption + floorStock + worstRiskUnits, caseSize);
+
+        // ── What-if: monthly ordering ──
+        const monthlyConsumption = Math.ceil(daily * 30);
+        const monthlyPar = roundToCase(monthlyConsumption + floorStock + riskBuffer, caseSize);
+
+        // ── Days of coverage ──
+        const currentDays = v.currentPar > 0 ? Math.floor(v.currentPar / daily) : 0;
+        const depletionDays = Math.floor(depletionPar / daily);
+        const riskDays = Math.floor(riskPar / daily);
+
+        // ── Stock remaining at end of cycle ──
+        const currentRemaining = v.currentPar - cycleConsumption;
+        const riskRemaining = riskPar - cycleConsumption;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // DIAGNOSTICS ENGINE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const diagnostics = [];
+
+        // 1. Demand estimate accuracy
+        if (demandSource === 'depletion' && v.demand > 0 && Math.abs(estimateVsReal) > 15) {
+            if (estimateVsReal > 0) {
+                diagnostics.push({
+                    level: 'critical',
+                    icon: '🔴',
+                    title: 'Usage Estimate is Understated',
+                    text: `Venue estimated ${v.demand}/month but depletion data shows actual usage is ${realMonthly}/month — ${Math.abs(estimateVsReal)}% higher than reported. All planning based on the estimate would under-provision.`,
+                    action: `Verify: Do a physical count now, then again in 2 weeks. Actual daily burn = (Count 1 − Count 2 + Received) / 14. This gives you the real number.`,
+                });
+            } else {
+                diagnostics.push({
+                    level: 'info',
+                    icon: '📊',
+                    title: 'Usage Estimate is Overstated',
+                    text: `Venue estimated ${v.demand}/month but depletion shows ${realMonthly}/month — ${Math.abs(estimateVsReal)}% lower. They may be over-ordering.`,
+                    action: `Check if recent orders included one-time stock-ups or event purchases inflating the estimate.`,
+                });
+            }
+        }
+
+        // 2. Late ordering behavior
+        if (v.lateDays > 14) {
+            const extraUnits = Math.ceil(daily * v.lateDays);
+            const extraCost = '(ask venue why orders are delayed)';
+            diagnostics.push({
+                level: v.lateDays > 21 ? 'critical' : 'warning',
+                icon: '⏰',
+                title: `Venue Orders ${v.lateDays} Days Late`,
+                text: `This adds ${extraUnits} units of buffer needed in the PAR — that's ${Math.round(extraUnits / realMonthly * 100)}% of monthly usage wasted as safety cushion. The gap between ideal PAR and realistic PAR is entirely caused by late ordering.`,
+                action: `<strong>Investigate:</strong> Is it the manager forgetting? No reorder trigger in place? Approval process too slow? Set a Min trigger at ${Math.ceil(v.currentPar * 0.5)} and enforce weekly stock checks.`,
+            });
+        }
+
+        // 3. Order frequency vs usage
+        if (months >= 2 && realMonthly > 30) {
+            diagnostics.push({
+                level: 'warning',
+                icon: '📦',
+                title: `High-Volume Item on ${freqLabels[v.orderFreq]} Cycle`,
+                text: `At ${realMonthly}/month, ordering ${freqLabels[v.orderFreq].toLowerCase()} means ${cycleConsumption} units consumed between orders. Switching to monthly would cut PAR from ${riskPar} → ${monthlyPar} (saving ${riskPar - monthlyPar} units of stock).`,
+                action: `<strong>Recommendation:</strong> Move to monthly ordering. PAR drops to <strong>${monthlyPar}</strong> and stockout risk decreases significantly.`,
+            });
+        }
+
+        // 4. Supplier lead time risk
+        if (supplierLT > 14) {
+            diagnostics.push({
+                level: 'info',
+                icon: '🚢',
+                title: `Long Supplier Lead Time (${supplierLT} days)`,
+                text: `If the warehouse is empty when the venue orders, the venue waits the full ${supplierLT}-day supplier cycle. The warehouse s/S system should prevent this, but if warehouse levels aren't maintained, this becomes the bottleneck.`,
+                action: `<strong>Check:</strong> Is the warehouse consistently stocked above its reorder point (s)? If warehouse stockouts are common, the problem isn't the venue PAR — it's the warehouse replenishment cycle.`,
+            });
+        }
+
+        // 5. Payment/processing delays
+        if (warehouseRisks[1].pct > 0.2) {
+            diagnostics.push({
+                level: 'warning',
+                icon: '💳',
+                title: 'Payment Delays Affecting Supply Chain',
+                text: `Payment holds rated at ${Math.round(warehouseRisks[1].pct * 100)}% likelihood. Each occurrence adds ~${warehouseRisks[1].days} days (${Math.ceil(daily * warehouseRisks[1].days)} units of extra buffer needed at the warehouse). This is a finance/ops problem — the warehouse s/S system absorbs it, but if it happens often, warehouse stock depletes faster.`,
+                action: `<strong>Investigate:</strong> Are POs getting approved on time? Is accounting paying invoices within terms? Set up auto-pay or pre-approved PO limits for recurring items.`,
+            });
+        }
+
+        // 6. PAR vs actual need mismatch
+        if (v.status === 'running_low' && v.currentPar > 0) {
+            if (v.currentPar >= riskPar) {
+                diagnostics.push({
+                    level: 'critical',
+                    icon: '🔍',
+                    title: 'PAR is Adequate But Venue Still Running Low',
+                    text: `Current PAR (${v.currentPar}) meets or exceeds the risk-adjusted recommendation (${riskPar}). If they're still running low, the issue is NOT the PAR level — it's one of: (a) usage is higher than detected, (b) they're not actually being restocked to full PAR, (c) there's theft/untracked loss.`,
+                    action: `<strong>Action items:</strong> 1) Physical count to verify they actually start at ${v.currentPar} after restock. 2) Check receiving — are full orders being delivered? 3) Track daily depletion for 2 weeks to get real usage.`,
+                });
+            } else {
+                diagnostics.push({
+                    level: 'warning',
+                    icon: '📈',
+                    title: 'PAR Needs Increase',
+                    text: `Current PAR (${v.currentPar}) is below the risk-adjusted recommendation (${riskPar}). With their ordering behavior and risk factors, they need ${riskPar - v.currentPar} more units to avoid running low.`,
+                    action: `<strong>Increase PAR to ${riskPar}</strong> (${riskPar / caseSize} cases). Or fix the ordering behavior to reduce the needed PAR.`,
+                });
+            }
+        }
+
+        if (v.status === 'too_much' && v.currentPar > 0) {
+            const excessOverDepletion = v.currentPar - depletionPar;
+            if (excessOverDepletion > caseSize) {
+                diagnostics.push({
+                    level: 'info',
+                    icon: '📉',
+                    title: 'PAR Can Be Reduced',
+                    text: `Venue reports excess stock. Current PAR (${v.currentPar}) is ${excessOverDepletion} units above the depletion-based need (${depletionPar}). That's ~${(excessOverDepletion / realMonthly).toFixed(1)} months of dead stock.`,
+                    action: `<strong>Safe to reduce PAR to ${riskPar}</strong> (keeps risk buffer). If ordering discipline is good, can go as low as <strong>${depletionPar}</strong>.`,
+                });
+            }
+        }
+
+        // 7. Attrition rate mismatch
+        if (attritionRate > 0 && v.currentPar > 0 && realMonthly > 0) {
+            const expectedFromAttrition = Math.round(v.currentPar * attritionRate);
+            if (realMonthly > expectedFromAttrition * 2) {
+                diagnostics.push({
+                    level: 'warning',
+                    icon: '💥',
+                    title: 'Actual Loss Far Exceeds Industry Attrition',
+                    text: `Industry rate (${(attritionRate*100)}%) predicts ${expectedFromAttrition}/month loss from PAR of ${v.currentPar}. Actual usage is ${realMonthly}/month — ${(realMonthly / expectedFromAttrition).toFixed(1)}× higher. This suggests excessive breakage, theft, or the item is being used/consumed faster than expected.`,
+                    action: `<strong>Investigate:</strong> Are staff trained on handling? Is storage adequate? Could guests be taking them? Consider switching to a sturdier variant if breakage is the issue.`,
+                });
+            }
+        }
+
+        // 8. If everything looks fine
+        if (v.status === 'running_ok' && diagnostics.length === 0) {
+            diagnostics.push({
+                level: 'ok',
+                icon: '✅',
+                title: 'No Issues Detected',
+                text: `Current PAR and ordering patterns appear adequate. Continue monitoring.`,
+                action: '',
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // RENDER
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        html += `<div class="par-rec-card" style="margin-top:24px">
+            <div class="card-title">${v.name}
+                <span class="badge">${v.status === 'running_low' ? '⚠️ Running Low' : v.status === 'too_much' ? '📦 Excess Stock' : '✅ OK'}</span>
+                ${demandSource === 'depletion' ? '<span class="badge" style="background:rgba(76,175,80,0.15);color:var(--success)">Depletion-Verified</span>' : '<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Estimate Only</span>'}
+            </div>`;
+
+        // Demand comparison
+        if (demandSource === 'depletion' && v.demand > 0) {
+            html += `<div style="display:flex;gap:20px;margin-bottom:16px;font-size:0.88rem">
+                <div><span class="text-muted">Their estimate:</span> <span style="text-decoration:line-through;color:var(--text-dim)">${v.demand}/mo</span></div>
+                <div><span class="text-muted">Depletion-verified:</span> <strong style="color:var(--accent)">${realMonthly}/mo</strong></div>
+                <div><span class="text-muted">Difference:</span> <strong style="color:${estimateVsReal > 15 ? 'var(--danger)' : 'var(--success)'}">${estimateVsReal > 0 ? estimateVsReal + '% understated' : Math.abs(estimateVsReal) + '% overstated'}</strong></div>
+            </div>`;
+        }
+
+        // PAR Recommendations — 3 tiers
+        html += `<div class="scenario-grid">
+            <div class="scenario-card depletion">
+                <div class="scenario-label">Depletion PAR</div>
+                <div class="scenario-value">${depletionPar}</div>
+                <div class="scenario-sub">${depletionDays} days · no risk buffer</div>
+            </div>
+            <div class="scenario-card risk">
+                <div class="scenario-label">Risk-Adjusted PAR</div>
+                <div class="scenario-value">${riskPar}</div>
+                <div class="scenario-sub">${riskDays} days · recommended</div>
+            </div>
+            <div class="scenario-card worst">
+                <div class="scenario-label">Worst Case PAR</div>
+                <div class="scenario-value">${worstPar}</div>
+                <div class="scenario-sub">Everything goes wrong</div>
+            </div>
+        </div>`;
+
+        // Current PAR vs recommended
+        if (v.currentPar > 0) {
+            const diff = riskPar - v.currentPar;
+            const diffText = diff > 0
+                ? `<span style="color:var(--danger)">Increase by ${diff} units (${Math.ceil(diff/caseSize)} cases)</span>`
+                : diff < -caseSize
+                    ? `<span style="color:var(--success)">Can reduce by ${Math.abs(diff)} units (${Math.floor(Math.abs(diff)/caseSize)} cases)</span>`
+                    : `<span style="color:var(--success)">Current PAR is appropriate</span>`;
+
+            html += `<div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:0.9rem">
+                Current PAR: <strong>${v.currentPar}</strong> → Recommended: <strong style="color:var(--accent)">${riskPar}</strong> · ${diffText}
+            </div>`;
+        }
+
+        // What-if monthly
+        if (months >= 2) {
+            html += `<div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:0.9rem;border-left:3px solid var(--accent)">
+                💡 <strong>If they ordered monthly:</strong> PAR could be <strong style="color:var(--accent)">${monthlyPar}</strong> instead of ${riskPar} — saves ${riskPar - monthlyPar} units of stock
+            </div>`;
+        }
+
+        // Depletion timeline bar
+        if (v.currentPar > 0) {
+            const barMax = Math.max(v.currentPar, riskPar, worstPar);
+            const lowPct = v.lowPoint / barMax * 100;
+            const floorPct = floorStock / barMax * 100;
+
+            html += `<div style="margin:16px 0">
+                <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Stock Depletion Over ${realCycleDays}-Day Cycle</div>
+                <div class="depletion-bar-bg">
+                    <div class="depletion-bar-fill" style="width:${v.currentPar/barMax*100}%;background:linear-gradient(90deg, var(--danger) 0%, var(--warn) ${100-lowPct}%, var(--success) 100%);opacity:0.7"></div>
+                </div>
+                <div class="depletion-markers">
+                    <div class="depletion-marker"><span class="dm-value">0</span><span>Stockout</span></div>
+                    <div class="depletion-marker"><span class="dm-value">${v.lowPoint}</span><span>Low point</span></div>
+                    <div class="depletion-marker"><span class="dm-value">${floorStock}</span><span>Floor stock</span></div>
+                    <div class="depletion-marker"><span class="dm-value">${v.currentPar}</span><span>Current PAR</span></div>
+                    ${riskPar > v.currentPar ? `<div class="depletion-marker"><span class="dm-value" style="color:var(--accent)">${riskPar}</span><span>Suggested</span></div>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // Breakdown table
+        html += `<div class="par-detail-grid">
+            <div>
+                <div class="par-detail-item"><span class="label">Real monthly usage</span><span class="value">${realMonthly}/mo</span></div>
+                <div class="par-detail-item"><span class="label">Daily usage</span><span class="value">${daily.toFixed(2)}/day</span></div>
+                <div class="par-detail-item"><span class="label">Order cycle (with delays)</span><span class="value">${realCycleDays} days</span></div>
+                <div class="par-detail-item"><span class="label">Cycle consumption</span><span class="value">${cycleConsumption} units</span></div>
+            </div>
+            <div>
+                <div class="par-detail-item"><span class="label">Floor stock (1wk peak)</span><span class="value">${floorStock} units</span></div>
+                <div class="par-detail-item"><span class="label">Risk buffer (weighted)</span><span class="value">+${riskBuffer} units</span></div>
+                <div class="par-detail-item"><span class="label">Velocity</span><span class="value">${vel}</span></div>
+                ${attritionRate > 0 ? `<div class="par-detail-item"><span class="label">Industry attrition</span><span class="value">${(attritionRate*100)}%/mo (expected ${Math.round(v.currentPar * attritionRate)}/mo)</span></div>` : ''}
+            </div>
+        </div>`;
+
+        // Risk factor breakdown
+        html += `<div style="margin-top:16px">
+            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Venue Risk Breakdown — Added to PAR</div>
+            <table class="result-table">
+                <tr><th>Risk</th><th>Extra Days</th><th>Raw Units</th><th>Likelihood</th><th>Weighted Units</th></tr>
+                ${riskBreakdown.map(r => `
+                <tr>
+                    <td>${r.name}</td>
+                    <td class="muted">${r.days}d</td>
+                    <td>${r.units}</td>
+                    <td class="muted">${Math.round(r.pct*100)}%</td>
+                    <td class="highlight">${r.weighted}</td>
+                </tr>`).join('')}
+                <tr style="border-top:2px solid var(--border-light)">
+                    <td colspan="4"><strong>Venue Risk Buffer (in PAR)</strong></td>
+                    <td class="highlight"><strong>${riskBuffer}</strong></td>
+                </tr>
+            </table>
+        </div>`;
+
+        // Warehouse risk reference
+        html += `<div style="margin-top:16px">
+            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Warehouse Risks — Handled by warehouse s/S (not in venue PAR)</div>
+            <table class="result-table">
+                <tr><th>Risk</th><th>Extra Days</th><th>Raw Units</th><th>Likelihood</th><th>Weighted Units</th></tr>
+                ${whRiskBreakdown.map(r => `
+                <tr>
+                    <td>${r.name}</td>
+                    <td class="muted">${r.days}d</td>
+                    <td>${r.units}</td>
+                    <td class="muted">${Math.round(r.pct*100)}%</td>
+                    <td class="muted">${r.weighted}</td>
+                </tr>`).join('')}
+                <tr style="border-top:2px solid var(--border-light)">
+                    <td colspan="4">Warehouse Risk Buffer (in s/S)</td>
+                    <td class="muted">${whRiskBuffer}</td>
+                </tr>
+            </table>
+        </div>`;
+
+        // Diagnostics
+        html += `<div class="diag-section">
+            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">🔎 Diagnostic Findings — Investigate These</div>
+            ${diagnostics.map(d => `
+            <div class="diag-card ${d.level}">
+                <div class="diag-icon">${d.icon}</div>
+                <div class="diag-content">
+                    <div class="diag-title">${d.title}</div>
+                    <div class="diag-text">${d.text}</div>
+                    ${d.action ? `<div class="diag-action">${d.action}</div>` : ''}
+                </div>
+            </div>`).join('')}
+        </div>`;
+
+        html += `</div>`; // close par-rec-card
+    });
+
+    document.getElementById('par-results').innerHTML = html;
+}
+
+// Init PAR advisor with one empty row
+addParVenue();
+</script>
+</body>
+</html>
