@@ -1111,54 +1111,49 @@
     <!-- NEW PAR SETUP TAB -->
     <div id="tab-newpar" class="hidden">
         <div class="card">
-            <div class="card-title">New PAR Setup <span class="badge">For New Venues</span></div>
+            <div class="card-title">New PAR Setup <span class="badge">Table-Based</span></div>
             <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:20px">
-                Calculate initial PARs for generic items using venue capacity and covers. Uses Three-PAR (floor + backup + wash) and Peak + Buffer methods side by side.
+                Set PARs by thinking in tables: how many of each item does a large table (12) need vs a small table (2)? The engine scales and calculates total PAR from there.
             </p>
 
             <div class="form-grid">
                 <div class="form-group">
                     <label>Venue Name</label>
-                    <input type="text" id="np-venue" placeholder="e.g. Delilah New York">
+                    <input type="text" id="np-venue" placeholder="e.g. Sushi by h.wood">
                 </div>
                 <div class="form-group">
                     <label>Total Seats</label>
-                    <input type="number" id="np-seats" placeholder="156" value="156">
+                    <input type="number" id="np-seats" placeholder="123" value="123">
                 </div>
                 <div class="form-group">
                     <label>Number of Tables</label>
-                    <input type="number" id="np-tables" placeholder="45" value="45">
+                    <input type="number" id="np-tables" placeholder="30" value="30">
                 </div>
                 <div class="form-group">
                     <label>Covers per Night</label>
-                    <input type="number" id="np-covers" placeholder="400" value="400">
+                    <input type="number" id="np-covers" placeholder="350" value="350">
                 </div>
                 <div class="form-group">
-                    <label>Turns per Night</label>
-                    <input type="number" id="np-turns" placeholder="2.5" value="2.5" step="0.5">
+                    <label>Largest Table Size</label>
+                    <input type="number" id="np-largest" placeholder="12" value="12">
                 </div>
                 <div class="form-group">
-                    <label>Days Open per Week</label>
-                    <input type="number" id="np-days" placeholder="7" value="7" min="1" max="7">
+                    <label>Smallest Table Size</label>
+                    <input type="number" id="np-smallest" placeholder="2" value="2">
                 </div>
             </div>
         </div>
 
-        <!-- Item Guest Ratios -->
+        <!-- Items with table-based inputs -->
         <div class="card">
-            <div class="card-title">Guest Usage Ratios <span class="badge">Adjust per venue</span></div>
+            <div class="card-title">Items — Per Table Quantities</div>
             <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:16px">
-                What fraction of guests use each item. 1.0 = every guest, 0.5 = half the guests. Adjust based on your menu and service style.
+                For each item, enter how many a large table and small table would use. The engine interpolates for average tables and calculates total PAR. Add or remove items as needed.
             </p>
-
-            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Glassware</div>
-            <div id="np-glass-items"></div>
-
-            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:20px">Dinnerware</div>
-            <div id="np-dinner-items"></div>
-
-            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:20px">Flatware</div>
-            <div id="np-flatware-items"></div>
+            <div id="np-items-list"></div>
+            <div class="btn-row" style="margin-top:12px">
+                <button class="btn btn-secondary" onclick="addNpItem()">+ Add Item</button>
+            </div>
         </div>
 
         <button class="btn btn-primary" onclick="runNewPar()" style="padding:14px 40px;font-size:1rem">
@@ -2097,82 +2092,130 @@ function runParAdvisor() {
 // Init PAR advisor with one empty row
 addParVenue();
 
-// ─── New PAR Setup Engine ───
+// ─── New PAR Setup Engine (Table-Based) ───
 
-const NEW_PAR_ITEMS = {
-    glass: [
-        { name: 'Water Glass', ratio: 1.0, type: 'sturdy', attrition: 0.07, category: 'Glassware' },
-        { name: 'Wine Glass (Red)', ratio: 0.5, type: 'delicate', attrition: 0.10, category: 'Glassware' },
-        { name: 'Wine Glass (White)', ratio: 0.4, type: 'delicate', attrition: 0.10, category: 'Glassware' },
-        { name: 'Rocks Glass', ratio: 0.3, type: 'sturdy', attrition: 0.07, category: 'Glassware' },
-        { name: 'Highball Glass', ratio: 0.3, type: 'sturdy', attrition: 0.07, category: 'Glassware' },
-        { name: 'Coffee Mug', ratio: 0.3, type: 'sturdy', attrition: 0.07, category: 'Glassware' },
-        { name: 'Tea Cup & Saucer', ratio: 0.15, type: 'sturdy', attrition: 0.07, category: 'Glassware' },
-    ],
-    dinner: [
-        { name: 'Dinner Plate', ratio: 1.0, type: 'sturdy', attrition: 0.03, category: 'Dinnerware' },
-        { name: 'Salad Plate', ratio: 0.7, type: 'sturdy', attrition: 0.03, category: 'Dinnerware' },
-        { name: 'Bread Plate', ratio: 0.8, type: 'sturdy', attrition: 0.03, category: 'Dinnerware' },
-        { name: 'Soup Bowl', ratio: 0.25, type: 'sturdy', attrition: 0.03, category: 'Dinnerware' },
-        { name: 'Ramekin', ratio: 0.5, type: 'sturdy', attrition: 0.03, category: 'Dinnerware' },
-    ],
-    flatware: [
-        { name: 'Dinner Fork', ratio: 1.0, type: 'durable', attrition: 0.04, category: 'Flatware' },
-        { name: 'Dinner Knife', ratio: 1.0, type: 'durable', attrition: 0.04, category: 'Flatware' },
-        { name: 'Steak Knife', ratio: 0.4, type: 'durable', attrition: 0.04, category: 'Flatware' },
-        { name: 'Soup Spoon', ratio: 0.25, type: 'durable', attrition: 0.04, category: 'Flatware' },
-        { name: 'Teaspoon', ratio: 0.5, type: 'durable', attrition: 0.04, category: 'Flatware' },
-        { name: 'Dessert Spoon', ratio: 0.35, type: 'durable', attrition: 0.04, category: 'Flatware' },
-    ],
-};
+const NP_DEFAULT_ITEMS = [
+    { name: 'Water Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 12, smQty: 2 },
+    { name: 'Wine Glass (Red)', category: 'Glassware', type: 'delicate', attrition: 0.10, lgQty: 6, smQty: 1 },
+    { name: 'Wine Glass (White)', category: 'Glassware', type: 'delicate', attrition: 0.10, lgQty: 5, smQty: 1 },
+    { name: 'Rocks Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 4, smQty: 1 },
+    { name: 'Highball Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 4, smQty: 1 },
+    { name: 'Tea Pot', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
+    { name: 'Tea Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 3, smQty: 0 },
+    { name: 'Coffee Cup', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
+    { name: 'Espresso Cup', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
+    { name: 'Water Pitcher', category: 'Glassware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 1 },
+    { name: 'Soy Sauce Dish', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
+    { name: 'Share Plate', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
+    { name: 'Chopstick Rest', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
+    { name: 'Soy Sauce Vessel', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 2, smQty: 1 },
+    { name: 'Creamer', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 0 },
+    { name: 'Sugar Caddy', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 0 },
+    { name: 'Check Presenter', category: 'Dinnerware', type: 'sturdy', attrition: 0.02, lgQty: 1, smQty: 1 },
+    { name: 'Dinner Fork', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
+    { name: 'Dinner Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
+    { name: 'Butter Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
+    { name: 'Dessert Spoon', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 7, smQty: 1 },
+    { name: 'Steak Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 7, smQty: 1 },
+    { name: 'Share Spoon', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 4, smQty: 1 },
+    { name: 'Share Tongs', category: 'Service', type: 'durable', attrition: 0.025, lgQty: 4, smQty: 1 },
+    { name: 'Bottle Coaster', category: 'Service', type: 'sturdy', attrition: 0.02, lgQty: 2, smQty: 1 },
+    { name: 'Oshibori Tongs', category: 'Service', type: 'durable', attrition: 0.025, lgQty: 1, smQty: 0 },
+];
 
-// Buffer multipliers by item type
-const BUFFER_MULT = { delicate: 2.0, sturdy: 1.5, durable: 1.5 };
-// Dish pit wash cycle % (what fraction is in wash at any moment)
-const WASH_CYCLE = { delicate: 0.40, sturdy: 0.23, durable: 0.14 };
-// Backup ratio (resets per table)
-const BACKUP_PER_TABLE = { delicate: 2, sturdy: 4, durable: 4 };
+let npItemCount = 0;
 
-function initNewParItems() {
-    ['glass', 'dinner', 'flatware'].forEach(group => {
-        const container = document.getElementById(`np-${group}-items`);
-        if (!container) return;
-        container.innerHTML = '';
-        NEW_PAR_ITEMS[group].forEach((item, idx) => {
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)';
-            row.innerHTML = `
-                <div style="flex:1;font-size:0.9rem">${item.name}</div>
-                <div style="width:80px">
-                    <input type="number" id="np-ratio-${group}-${idx}" value="${item.ratio}" min="0" max="2" step="0.05"
-                        style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'DM Sans';font-size:0.85rem;width:100%;text-align:center">
-                </div>
-                <div style="width:70px;font-size:0.75rem;color:var(--text-muted);text-align:center">${item.type}</div>
-                <div style="width:70px;font-size:0.75rem;color:var(--text-muted);text-align:center">${(item.attrition*100)}%/mo</div>
-            `;
-            container.appendChild(row);
-        });
-    });
+function initNpItems() {
+    const container = document.getElementById('np-items-list');
+    if (!container) return;
+    // Add header
+    container.innerHTML = `<div style="display:grid;grid-template-columns:1fr 120px 90px 90px 80px 80px 40px;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">
+        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Item Name</span>
+        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Category</span>
+        <span style="font-size:0.68rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">Lg Table</span>
+        <span style="font-size:0.68rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">Sm Table</span>
+        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Type</span>
+        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Attrition</span>
+        <span></span>
+    </div>`;
+    NP_DEFAULT_ITEMS.forEach(item => addNpItem(item.name, item.category, item.lgQty, item.smQty, item.type, item.attrition));
+}
+
+function addNpItem(name='', category='Glassware', lgQty='', smQty='', type='sturdy', attrition=0.07) {
+    npItemCount++;
+    const id = npItemCount;
+    const container = document.getElementById('np-items-list');
+    const row = document.createElement('div');
+    row.id = `np-item-${id}`;
+    row.className = 'np-item-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 120px 90px 90px 80px 80px 40px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)';
+    row.innerHTML = `
+        <input type="text" value="${name}" data-field="name" placeholder="Item name" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'DM Sans';font-size:0.85rem;width:100%">
+        <select data-field="category" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'DM Sans';font-size:0.8rem;width:100%">
+            <option value="Glassware" ${category==='Glassware'?'selected':''}>Glassware</option>
+            <option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option>
+            <option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option>
+            <option value="Service" ${category==='Service'?'selected':''}>Service</option>
+            <option value="Bar Tools" ${category==='Bar Tools'?'selected':''}>Bar Tools</option>
+        </select>
+        <input type="number" value="${lgQty}" data-field="lgQty" min="0" step="1" style="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:8px;color:var(--accent);font-family:'DM Sans';font-size:0.88rem;width:100%;text-align:center;font-weight:600">
+        <input type="number" value="${smQty}" data-field="smQty" min="0" step="1" style="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:8px;color:var(--accent);font-family:'DM Sans';font-size:0.88rem;width:100%;text-align:center;font-weight:600">
+        <select data-field="type" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text-muted);font-family:'DM Sans';font-size:0.78rem;width:100%">
+            <option value="delicate" ${type==='delicate'?'selected':''}>Delicate</option>
+            <option value="sturdy" ${type==='sturdy'?'selected':''}>Sturdy</option>
+            <option value="durable" ${type==='durable'?'selected':''}>Durable</option>
+        </select>
+        <select data-field="attrition" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text-muted);font-family:'DM Sans';font-size:0.78rem;width:100%">
+            <option value="0.10" ${attrition==0.10?'selected':''}>10%</option>
+            <option value="0.07" ${attrition==0.07?'selected':''}>7%</option>
+            <option value="0.04" ${attrition==0.04?'selected':''}>4%</option>
+            <option value="0.03" ${attrition==0.03?'selected':''}>3%</option>
+            <option value="0.025" ${attrition==0.025?'selected':''}>2.5%</option>
+            <option value="0.02" ${attrition==0.02?'selected':''}>2%</option>
+        </select>
+        <button class="btn btn-danger" onclick="document.getElementById('np-item-${id}').remove()">×</button>
+    `;
+    container.appendChild(row);
 }
 
 function runNewPar() {
     const venueName = document.getElementById('np-venue').value || 'New Venue';
-    const seats = parseFloat(document.getElementById('np-seats').value) || 156;
-    const tables = parseFloat(document.getElementById('np-tables').value) || 45;
-    const covers = parseFloat(document.getElementById('np-covers').value) || 400;
-    const turns = parseFloat(document.getElementById('np-turns').value) || 2.5;
-    const daysOpen = parseFloat(document.getElementById('np-days').value) || 7;
+    const seats = parseFloat(document.getElementById('np-seats').value) || 123;
+    const tables = parseFloat(document.getElementById('np-tables').value) || 30;
+    const covers = parseFloat(document.getElementById('np-covers').value) || 350;
+    const lgTable = parseFloat(document.getElementById('np-largest').value) || 12;
+    const smTable = parseFloat(document.getElementById('np-smallest').value) || 2;
+    const avgPerTable = covers / tables;
 
-    // Read updated ratios
-    const allItems = [];
-    ['glass', 'dinner', 'flatware'].forEach(group => {
-        NEW_PAR_ITEMS[group].forEach((item, idx) => {
-            const ratioInput = document.getElementById(`np-ratio-${group}-${idx}`);
-            const ratio = ratioInput ? parseFloat(ratioInput.value) || 0 : item.ratio;
-            if (ratio > 0) {
-                allItems.push({ ...item, ratio });
-            }
-        });
+    // Buffer multipliers
+    const BUF = { delicate: 2.0, sturdy: 1.5, durable: 1.5 };
+    const WASH = { delicate: 0.40, sturdy: 0.23, durable: 0.14 };
+
+    // Read all items
+    const rows = document.querySelectorAll('.np-item-row');
+    const items = [];
+    rows.forEach(row => {
+        const name = row.querySelector('[data-field="name"]').value.trim();
+        const category = row.querySelector('[data-field="category"]').value;
+        const lgQty = parseFloat(row.querySelector('[data-field="lgQty"]').value) || 0;
+        const smQty = parseFloat(row.querySelector('[data-field="smQty"]').value) || 0;
+        const type = row.querySelector('[data-field="type"]').value;
+        const attrition = parseFloat(row.querySelector('[data-field="attrition"]').value) || 0.07;
+        if (name && (lgQty > 0 || smQty > 0)) {
+            items.push({ name, category, lgQty, smQty, type, attrition });
+        }
+    });
+
+    if (items.length === 0) { alert('Add at least one item.'); return; }
+
+    // ── Calculate per-guest ratio from table inputs ──
+    // Interpolate: ratio = qty_per_avg_table / avg_table_size
+    // Linear interpolation between small and large table
+    items.forEach(item => {
+        // Qty for average table size (interpolate between small and large)
+        const slope = (item.lgQty - item.smQty) / (lgTable - smTable);
+        item.avgQty = item.smQty + slope * (avgPerTable - smTable);
+        item.ratio = item.avgQty / avgPerTable;
     });
 
     let html = '';
@@ -2180,124 +2223,111 @@ function runNewPar() {
     // Venue summary
     html += `<div class="card" style="margin-top:24px">
         <div class="card-title">${venueName} <span class="badge">Initial PAR Setup</span></div>
-        <div style="display:flex;gap:30px;font-size:0.88rem;color:var(--text-muted);margin-bottom:16px">
+        <div style="display:flex;gap:24px;font-size:0.88rem;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap">
             <span><strong style="color:var(--text)">${seats}</strong> seats</span>
             <span><strong style="color:var(--text)">${tables}</strong> tables</span>
             <span><strong style="color:var(--text)">${covers}</strong> covers/night</span>
-            <span><strong style="color:var(--text)">${turns}</strong> turns</span>
-            <span><strong style="color:var(--text)">${daysOpen}</strong> days/week</span>
+            <span>Lg table: <strong style="color:var(--text)">${lgTable}</strong></span>
+            <span>Sm table: <strong style="color:var(--text)">${smTable}</strong></span>
+            <span>Avg covers/table: <strong style="color:var(--text)">${avgPerTable.toFixed(1)}</strong></span>
         </div>`;
 
     // Results table
     html += `<table class="result-table">
         <tr>
             <th>Item</th>
-            <th>Per Guest</th>
+            <th style="text-align:center">Lg Tbl<br><span style="font-weight:400">(${lgTable})</span></th>
+            <th style="text-align:center">Sm Tbl<br><span style="font-weight:400">(${smTable})</span></th>
+            <th style="text-align:center">Avg Tbl<br><span style="font-weight:400">(${avgPerTable.toFixed(0)})</span></th>
             <th style="text-align:center">PAR 1<br><span style="font-weight:400;font-size:0.6rem">Floor</span></th>
             <th style="text-align:center">PAR 2<br><span style="font-weight:400;font-size:0.6rem">Backup</span></th>
             <th style="text-align:center">PAR 3<br><span style="font-weight:400;font-size:0.6rem">Wash</span></th>
             <th style="text-align:center">Three-PAR</th>
             <th style="text-align:center">Peak+Buf</th>
             <th style="text-align:center;color:var(--accent)">Suggested</th>
-            <th>Monthly Repl.</th>
+            <th>Repl/mo</th>
         </tr>`;
 
-    let currentCategory = '';
-    let totalThreePar = 0;
-    let totalPeakBuf = 0;
-    let totalSuggested = 0;
-    let totalMonthlyRepl = 0;
+    let currentCat = '';
+    let totalTP = 0, totalPB = 0, totalSugg = 0, totalRepl = 0;
 
-    allItems.forEach(item => {
-        // Category separator
-        if (item.category !== currentCategory) {
-            currentCategory = item.category;
-            html += `<tr><td colspan="9" style="padding:12px 14px;font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${currentCategory}</strong></td></tr>`;
+    items.forEach(item => {
+        if (item.category !== currentCat) {
+            currentCat = item.category;
+            html += `<tr><td colspan="11" style="padding:12px 14px;font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${currentCat}</strong></td></tr>`;
         }
 
-        const bufferMult = BUFFER_MULT[item.type];
-        const washPct = WASH_CYCLE[item.type];
-        const backupPerTable = BACKUP_PER_TABLE[item.type];
+        const wash = WASH[item.type];
+        const buf = BUF[item.type];
+        const backupPerTable = item.type === 'delicate' ? 2 : 4;
 
-        // Method 3: Three-PAR
-        // PAR 1: Peak simultaneous on floor = 71% of (covers × ratio)
+        // Three-PAR
         const par1 = Math.ceil(covers * item.ratio * 0.71);
-        // PAR 2: Backup for resets = tables × backup multiplier × ratio
         const par2 = Math.ceil(tables * backupPerTable * item.ratio);
-        // PAR 3: In wash cycle = PAR 1 × wash cycle %
-        const par3 = Math.ceil(par1 * washPct);
+        const par3 = Math.ceil(par1 * wash);
         const threePar = par1 + par2 + par3;
 
-        // Method 4: Peak + Buffer
-        // Peak simultaneous = covers × ratio × 0.85
+        // Peak + Buffer
         const peak = Math.ceil(covers * item.ratio * 0.85);
-        const peakBuf = Math.ceil(peak * bufferMult);
+        const peakBuf = Math.ceil(peak * buf);
 
-        // Suggested: average of both methods, rounded to nearest 5
-        const avg = (threePar + peakBuf) / 2;
-        const suggested = Math.ceil(avg / 5) * 5;
+        // Suggested: average rounded to nearest 5
+        const suggested = Math.ceil((threePar + peakBuf) / 2 / 5) * 5;
+        const repl = Math.ceil(suggested * item.attrition);
 
-        // Monthly replacement (attrition)
-        const monthlyRepl = Math.ceil(suggested * item.attrition);
-
-        totalThreePar += threePar;
-        totalPeakBuf += peakBuf;
-        totalSuggested += suggested;
-        totalMonthlyRepl += monthlyRepl;
+        totalTP += threePar;
+        totalPB += peakBuf;
+        totalSugg += suggested;
+        totalRepl += repl;
 
         html += `<tr>
-            <td><strong>${item.name}</strong></td>
-            <td class="muted">${item.ratio}</td>
+            <td><strong>${item.name}</strong><br><span class="muted" style="font-size:0.72rem">${item.type} · ${(item.attrition*100)}%/mo</span></td>
+            <td style="text-align:center">${item.lgQty}</td>
+            <td style="text-align:center">${item.smQty}</td>
+            <td style="text-align:center">${item.avgQty.toFixed(1)}</td>
             <td style="text-align:center">${par1}</td>
             <td style="text-align:center">${par2}</td>
             <td style="text-align:center">${par3}</td>
             <td style="text-align:center"><strong>${threePar}</strong></td>
             <td style="text-align:center"><strong>${peakBuf}</strong></td>
             <td style="text-align:center" class="highlight"><strong>${suggested}</strong></td>
-            <td class="muted">${monthlyRepl}/mo</td>
+            <td class="muted">${repl}</td>
         </tr>`;
     });
 
-    // Totals row
     html += `<tr style="border-top:2px solid var(--border-light)">
-        <td colspan="5"><strong>TOTALS</strong></td>
-        <td style="text-align:center"><strong>${totalThreePar}</strong></td>
-        <td style="text-align:center"><strong>${totalPeakBuf}</strong></td>
-        <td style="text-align:center" class="highlight"><strong>${totalSuggested}</strong></td>
-        <td class="muted"><strong>${totalMonthlyRepl}/mo</strong></td>
-    </tr>`;
+        <td colspan="7"><strong>TOTALS</strong></td>
+        <td style="text-align:center"><strong>${totalTP}</strong></td>
+        <td style="text-align:center"><strong>${totalPB}</strong></td>
+        <td style="text-align:center" class="highlight"><strong>${totalSugg}</strong></td>
+        <td class="muted"><strong>${totalRepl}</strong></td>
+    </tr></table></div>`;
 
-    html += `</table></div>`;
-
-    // Method explanation
+    // How it works
     html += `<div class="card">
         <div class="card-title">How It Works</div>
         <div class="par-detail-grid">
             <div>
-                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Three-PAR Method</div>
-                <div class="par-detail-item"><span class="label">PAR 1 (Floor)</span><span class="value">71% of covers × ratio</span></div>
-                <div class="par-detail-item"><span class="label">PAR 2 (Backup)</span><span class="value">Tables × ${JSON.stringify(BACKUP_PER_TABLE)}</span></div>
-                <div class="par-detail-item"><span class="label">PAR 3 (Wash)</span><span class="value">PAR 1 × wash cycle %</span></div>
-                <div class="par-detail-item"><span class="label">Wash cycle %</span><span class="value">Delicate: 40%, Sturdy: 23%, Durable: 14%</span></div>
+                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Table → Ratio Conversion</div>
+                <div class="par-detail-item"><span class="label">Input</span><span class="value">Qty for large table (${lgTable}) & small table (${smTable})</span></div>
+                <div class="par-detail-item"><span class="label">Interpolation</span><span class="value">Linear scale to avg table (${avgPerTable.toFixed(1)} covers)</span></div>
+                <div class="par-detail-item"><span class="label">Per-guest ratio</span><span class="value">Avg table qty ÷ avg table size</span></div>
             </div>
             <div>
-                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Peak + Buffer Method</div>
-                <div class="par-detail-item"><span class="label">Peak</span><span class="value">Covers × ratio × 85%</span></div>
-                <div class="par-detail-item"><span class="label">Delicate buffer</span><span class="value">2.0× (wine stems, coupes)</span></div>
-                <div class="par-detail-item"><span class="label">Sturdy buffer</span><span class="value">1.5× (rocks, plates, mugs)</span></div>
-                <div class="par-detail-item"><span class="label">Durable buffer</span><span class="value">1.5× (flatware)</span></div>
+                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">PAR Calculation</div>
+                <div class="par-detail-item"><span class="label">PAR 1 (Floor)</span><span class="value">71% of covers × ratio</span></div>
+                <div class="par-detail-item"><span class="label">PAR 2 (Backup)</span><span class="value">Tables × backup per table × ratio</span></div>
+                <div class="par-detail-item"><span class="label">PAR 3 (Wash)</span><span class="value">PAR 1 × wash cycle %</span></div>
+                <div class="par-detail-item"><span class="label">Suggested</span><span class="value">Average of Three-PAR & Peak+Buffer, round to 5</span></div>
             </div>
-        </div>
-        <div style="margin-top:16px;padding:12px 16px;background:var(--surface-2);border-radius:8px;font-size:0.85rem;color:var(--text-muted)">
-            <strong style="color:var(--text)">Suggested PAR</strong> = Average of both methods, rounded to nearest 5. Monthly replacement = Suggested × attrition rate.
         </div>
     </div>`;
 
     document.getElementById('newpar-results').innerHTML = html;
 }
 
-// Initialize New PAR item rows
-initNewParItems();
+// Initialize
+initNpItems();
 </script>
 </body>
 </html>
