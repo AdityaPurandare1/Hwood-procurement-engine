@@ -1187,6 +1187,18 @@
             </div>
         </div>
 
+        <!-- Bulk Edit Bar -->
+        <div class="card" id="np-bulk-bar" style="display:none">
+            <div class="card-title">Bulk Edit</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-secondary" onclick="bulkClearOverrides()" style="font-size:0.8rem;border-color:var(--warn);color:var(--warn)">Clear All Overrides</button>
+                <button class="btn btn-secondary" onclick="bulkSetLgTable()" style="font-size:0.8rem">Set All Lg Table</button>
+                <button class="btn btn-secondary" onclick="bulkSetSmTable()" style="font-size:0.8rem">Set All Sm Table</button>
+                <button class="btn btn-secondary" onclick="bulkSetTablesByCategory()" style="font-size:0.8rem;border-color:var(--accent);color:var(--accent)">Set Tables by Category</button>
+                <button class="btn btn-secondary" onclick="bulkRemoveEmpty()" style="font-size:0.8rem;border-color:var(--danger);color:var(--danger)">Remove Empty Items</button>
+            </div>
+        </div>
+
         <div id="np-run-btn" style="display:none">
             <button class="btn btn-primary" onclick="runNewPar()" style="padding:14px 40px;font-size:1rem">
                 ▶ Calculate Initial PARs
@@ -2247,12 +2259,12 @@ function loadCuisinePreset() {
         sd.appendChild(btn);
     });
     rebuildItems(cuisine);
-    ['np-sections-card','np-items-card','np-run-btn'].forEach(id => document.getElementById(id).style.display='');
+    ['np-sections-card','np-items-card','np-run-btn','np-bulk-bar'].forEach(id => document.getElementById(id).style.display='');
 }
 
 function rebuildItems(cuisine) {
     const p = CUISINE_PRESETS[cuisine]; const c = document.getElementById('np-items-list');
-    c.innerHTML = '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+    c.innerHTML = npItemsHeader();
     npItemCount = 0;
     Object.entries(p.sections).forEach(([sec, items]) => { if (!activeSections[sec]) return; items.forEach(([n,cat,t,a,lg,sm]) => addNpItem(n,cat,lg,sm,t,a,sec,'')); });
 }
@@ -2268,6 +2280,58 @@ function addNpItem(name='',category='Glassware',lgQty='',smQty='',type='sturdy',
     c.appendChild(row);
 }
 
+function npItemsHeader() {
+    return '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+}
+
+// ─── Bulk Edit Functions ───
+function bulkClearOverrides() {
+    document.querySelectorAll('.np-item-row [data-field="override"]').forEach(inp => { inp.value = ''; });
+}
+
+function bulkSetLgTable() {
+    const val = prompt('Set Lg Table qty for ALL items (leave blank to cancel):');
+    if (val === null || val === '') return;
+    const n = parseInt(val);
+    if (isNaN(n)) return;
+    document.querySelectorAll('.np-item-row [data-field="lgQty"]').forEach(inp => { inp.value = n; });
+}
+
+function bulkSetSmTable() {
+    const val = prompt('Set Sm Table qty for ALL items (leave blank to cancel):');
+    if (val === null || val === '') return;
+    const n = parseInt(val);
+    if (isNaN(n)) return;
+    document.querySelectorAll('.np-item-row [data-field="smQty"]').forEach(inp => { inp.value = n; });
+}
+
+function bulkSetTablesByCategory() {
+    const cat = prompt('Which category? (Glassware / Dinnerware / Flatware / Service):');
+    if (!cat) return;
+    const lgVal = prompt(`Lg Table qty for ${cat}:`);
+    if (lgVal === null) return;
+    const smVal = prompt(`Sm Table qty for ${cat}:`);
+    if (smVal === null) return;
+    const lg = parseInt(lgVal) || 0;
+    const sm = parseInt(smVal) || 0;
+    document.querySelectorAll('.np-item-row').forEach(row => {
+        const rowCat = row.querySelector('[data-field="category"]').value;
+        if (rowCat.toLowerCase() === cat.toLowerCase()) {
+            row.querySelector('[data-field="lgQty"]').value = lg;
+            row.querySelector('[data-field="smQty"]').value = sm;
+        }
+    });
+}
+
+function bulkRemoveEmpty() {
+    document.querySelectorAll('.np-item-row').forEach(row => {
+        const lg = row.querySelector('[data-field="lgQty"]').value.trim();
+        const sm = row.querySelector('[data-field="smQty"]').value.trim();
+        const ov = row.querySelector('[data-field="override"]').value.trim();
+        if (!lg && !sm && !ov) row.remove();
+    });
+}
+
 // ─── CSV/Excel Import ───
 async function importBible() {
     const fileInput = document.getElementById('np-file-input');
@@ -2279,33 +2343,55 @@ async function importBible() {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, {type:'array'});
         const items = [];
-        const catMap = {'smallware':'Flatware','plateware':'Dinnerware','glassware':'Glassware','collateral':'Service','barware':'Service'};
+        const catMap = {'smallware':'Flatware','plateware':'Dinnerware','glassware':'Glassware','collateral':'Service','barware':'Service','light bulbs':'Service'};
+        const skipNames = ['item','image','','dining room','plateware','glassware','smallware','barware','collateral','delilah','pantones'];
         workbook.SheetNames.forEach(sheetName => {
             const ws = workbook.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
             const cat = catMap[sheetName.toLowerCase()] || 'Service';
-            rows.forEach(row => {
-                const name = row[1] ? String(row[1]).trim() : '';
-                if (!name || name==='Item' || name.length < 2) return;
-                let qty = '';
-                for (let i = 7; i >= 5; i--) {
-                    if (row[i]) { const v = String(row[i]).trim(); const n = parseInt(v); if (!isNaN(n) && n > 0) { qty = n; break; } }
+            // Find the qty column by scanning header row for keywords
+            let qtyCol = -1;
+            let headerRow = -1;
+            for (let r = 0; r < Math.min(5, rows.length); r++) {
+                for (let c = 0; c < (rows[r]||[]).length; c++) {
+                    const h = String(rows[r][c]||'').toLowerCase();
+                    if (h.includes('opening order') || h.includes('dallas') || h === 'par' || h === 'qty ordered' || h === 'quantity') {
+                        qtyCol = c; headerRow = r; break;
+                    }
                 }
-                if (qty) items.push({name, category: cat, qty});
+                if (qtyCol >= 0) break;
+            }
+            // Also check last numeric column as fallback
+            rows.forEach((row, ri) => {
+                if (ri <= headerRow) return;
+                const name = row[1] ? String(row[1]).trim() : '';
+                if (!name || name.length < 2 || skipNames.includes(name.toLowerCase())) return;
+                // Skip header-like rows
+                if (name.toLowerCase().includes('manufacturer') || name === 'Item') return;
+                let qty = '';
+                if (qtyCol >= 0 && row[qtyCol]) {
+                    const v = String(row[qtyCol]).trim();
+                    const n = parseInt(v.replace(/[^0-9]/g,''));
+                    if (!isNaN(n) && n > 0) qty = n;
+                }
+                items.push({name, category: cat, qty: qty || '', sheet: sheetName});
             });
         });
-        // Show items and build into the list
+        // Build items list with header
         const c = document.getElementById('np-items-list');
-        c.innerHTML = '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+        c.innerHTML = npItemsHeader();
         npItemCount = 0;
+        let withQty = 0;
         items.forEach(i => {
             const type = i.category==='Glassware'?'sturdy':i.category==='Flatware'?'durable':'sturdy';
             const attr = i.category==='Glassware'?0.07:i.category==='Flatware'?0.04:0.03;
-            addNpItem(i.name, i.category, '', '', type, attr, 'Imported', i.qty);
+            addNpItem(i.name, i.category, '', '', type, attr, i.sheet, i.qty);
+            if (i.qty) withQty++;
         });
-        status.innerHTML = `<span style="color:var(--success)">✓ Imported ${items.length} items from ${workbook.SheetNames.length} sheets.</span> Per-table quantities are blank — set them or use overrides.`;
+        status.innerHTML = `<span style="color:var(--success)">✓ Imported ${items.length} items from ${workbook.SheetNames.length} sheets (${workbook.SheetNames.join(', ')}). ${withQty} items had quantities → placed in Override.</span>`;
         ['np-items-card','np-run-btn'].forEach(id => document.getElementById(id).style.display='');
-    } catch(e) { status.textContent = 'Error: ' + e.message; }
+        document.getElementById('np-bulk-bar').style.display = '';
+    } catch(e) { status.textContent = 'Error: ' + e.message; console.error(e); }
 }
 
 function runNewPar() {
