@@ -1111,15 +1111,30 @@
     <!-- NEW PAR SETUP TAB -->
     <div id="tab-newpar" class="hidden">
         <div class="card">
-            <div class="card-title">New PAR Setup <span class="badge">Table-Based</span></div>
+            <div class="card-title">New PAR Setup <span class="badge">Cuisine-Based</span></div>
             <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:20px">
-                Set PARs by thinking in tables: how many of each item does a large table (12) need vs a small table (2)? The engine scales and calculates total PAR from there.
+                Select a cuisine preset or import your Bible (CSV/Excel). Toggle menu sections, adjust per-table quantities, override any item, then export to Excel.
             </p>
-
             <div class="form-grid">
                 <div class="form-group">
                     <label>Venue Name</label>
-                    <input type="text" id="np-venue" placeholder="e.g. Sushi by h.wood">
+                    <input type="text" id="np-venue" placeholder="e.g. Delilah Dallas">
+                </div>
+                <div class="form-group">
+                    <label>Cuisine Type</label>
+                    <select id="np-cuisine" onchange="loadCuisinePreset()">
+                        <option value="">— Select Cuisine —</option>
+                        <option value="japanese">Japanese</option>
+                        <option value="chinese">Chinese / Dim Sum</option>
+                        <option value="korean">Korean</option>
+                        <option value="indian">Indian</option>
+                        <option value="thai">Thai / SE Asian</option>
+                        <option value="middle_eastern">Middle Eastern / Med</option>
+                        <option value="mexican">Mexican / Latin</option>
+                        <option value="italian">Italian</option>
+                        <option value="french">French</option>
+                        <option value="steakhouse">American / Steakhouse</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Total Seats</label>
@@ -1144,26 +1159,45 @@
             </div>
         </div>
 
-        <!-- Items with table-based inputs -->
+        <!-- CSV Import -->
         <div class="card">
-            <div class="card-title">Items — Per Table Quantities</div>
-            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:16px">
-                For each item, enter how many a large table and small table would use. The engine interpolates for average tables and calculates total PAR. Add or remove items as needed.
+            <div class="card-title">Import Bible <span class="badge">CSV / Excel</span></div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                Upload your venue Bible. The engine reads item names and quantities from each sheet and maps them to categories. Per-table quantities default from the cuisine preset or can be set manually.
             </p>
+            <div style="display:flex;gap:12px;align-items:center">
+                <input type="file" id="np-file-input" accept=".csv,.xlsx,.xls" style="font-family:'DM Sans';font-size:0.85rem;color:var(--text-muted)">
+                <button class="btn btn-secondary" onclick="importBible()">Import</button>
+            </div>
+            <div id="np-import-status" style="margin-top:10px;font-size:0.82rem;color:var(--text-muted)"></div>
+        </div>
+
+        <!-- Menu Sections Toggle -->
+        <div class="card" id="np-sections-card" style="display:none">
+            <div class="card-title">Menu Sections <span class="badge">Toggle on/off</span></div>
+            <div id="np-sections" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+
+        <!-- Items -->
+        <div class="card" id="np-items-card" style="display:none">
+            <div class="card-title">Items — Per Table Quantities & Override</div>
             <div id="np-items-list"></div>
             <div class="btn-row" style="margin-top:12px">
                 <button class="btn btn-secondary" onclick="addNpItem()">+ Add Item</button>
             </div>
         </div>
 
-        <button class="btn btn-primary" onclick="runNewPar()" style="padding:14px 40px;font-size:1rem">
-            ▶ Calculate Initial PARs
-        </button>
+        <div id="np-run-btn" style="display:none">
+            <button class="btn btn-primary" onclick="runNewPar()" style="padding:14px 40px;font-size:1rem">
+                ▶ Calculate Initial PARs
+            </button>
+        </div>
 
         <div id="newpar-results"></div>
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ─── State ───
 let venueCount = 0;
@@ -2092,242 +2126,308 @@ function runParAdvisor() {
 // Init PAR advisor with one empty row
 addParVenue();
 
-// ─── New PAR Setup Engine (Table-Based) ───
+// ─── New PAR Setup Engine (Cuisine + CSV + Override + Export) ───
 
-const NP_DEFAULT_ITEMS = [
-    { name: 'Water Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 12, smQty: 2 },
-    { name: 'Wine Glass (Red)', category: 'Glassware', type: 'delicate', attrition: 0.10, lgQty: 6, smQty: 1 },
-    { name: 'Wine Glass (White)', category: 'Glassware', type: 'delicate', attrition: 0.10, lgQty: 5, smQty: 1 },
-    { name: 'Rocks Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 4, smQty: 1 },
-    { name: 'Highball Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 4, smQty: 1 },
-    { name: 'Tea Pot', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
-    { name: 'Tea Glass', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 3, smQty: 0 },
-    { name: 'Coffee Cup', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
-    { name: 'Espresso Cup', category: 'Glassware', type: 'sturdy', attrition: 0.07, lgQty: 2, smQty: 0 },
-    { name: 'Water Pitcher', category: 'Glassware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 1 },
-    { name: 'Soy Sauce Dish', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
-    { name: 'Share Plate', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
-    { name: 'Chopstick Rest', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 12, smQty: 2 },
-    { name: 'Soy Sauce Vessel', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 2, smQty: 1 },
-    { name: 'Creamer', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 0 },
-    { name: 'Sugar Caddy', category: 'Dinnerware', type: 'sturdy', attrition: 0.03, lgQty: 1, smQty: 0 },
-    { name: 'Check Presenter', category: 'Dinnerware', type: 'sturdy', attrition: 0.02, lgQty: 1, smQty: 1 },
-    { name: 'Dinner Fork', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
-    { name: 'Dinner Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
-    { name: 'Butter Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 12, smQty: 2 },
-    { name: 'Dessert Spoon', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 7, smQty: 1 },
-    { name: 'Steak Knife', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 7, smQty: 1 },
-    { name: 'Share Spoon', category: 'Flatware', type: 'durable', attrition: 0.04, lgQty: 4, smQty: 1 },
-    { name: 'Share Tongs', category: 'Service', type: 'durable', attrition: 0.025, lgQty: 4, smQty: 1 },
-    { name: 'Bottle Coaster', category: 'Service', type: 'sturdy', attrition: 0.02, lgQty: 2, smQty: 1 },
-    { name: 'Oshibori Tongs', category: 'Service', type: 'durable', attrition: 0.025, lgQty: 1, smQty: 0 },
-];
+const CUISINE_PRESETS = {
+    japanese: { name: 'Japanese', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Soy Sauce Dish','Dinnerware','sturdy',0.03,12,2],['Soy Sauce Vessel','Dinnerware','sturdy',0.03,2,1],['GF Soy Vessel','Dinnerware','sturdy',0.03,1,0],['Chopstick Rest','Dinnerware','sturdy',0.03,8,5],['Share Plate','Dinnerware','sturdy',0.03,12,2],['Oshibori Tray (Sm)','Service','sturdy',0.02,1,1],['Oshibori Tray (Lg)','Service','sturdy',0.02,1,0],['Oshibori Tongs','Service','durable',0.025,1,0],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Sushi & Sashimi': [['Sushi Plate/Platter','Dinnerware','sturdy',0.03,4,1],['Small Coupe Plate','Dinnerware','sturdy',0.03,6,2],['Sashimi Plate','Dinnerware','sturdy',0.03,3,1]],
+        'Robata / Grill': [['Skewer Plate','Dinnerware','sturdy',0.03,4,1],['Share Tongs','Service','durable',0.025,3,0]],
+        'Noodles & Rice': [['Noodle/Rice Bowl','Dinnerware','sturdy',0.03,6,1],['Stone Rice Bowl','Dinnerware','sturdy',0.02,3,0]],
+        'Tempura': [['Tempura Plate','Dinnerware','sturdy',0.03,3,1],['Dipping Sauce Bowl','Dinnerware','sturdy',0.03,4,1]],
+        'Tea Service': [['Tea Pot','Glassware','sturdy',0.07,1,0],['Tea Glass','Glassware','sturdy',0.07,2,0]],
+        'Sake Service': [['Sake Glass','Glassware','delicate',0.10,6,1],['Sake Carafe','Glassware','sturdy',0.07,2,1]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,6,1],['Wine Glass (White)','Glassware','delicate',0.10,5,1]],
+        'Coffee & Espresso': [['Coffee Cup','Glassware','sturdy',0.07,1,0],['Coffee Saucer','Dinnerware','sturdy',0.03,1,0],['Espresso Cup','Glassware','sturdy',0.07,1,0],['Espresso Saucer','Dinnerware','sturdy',0.03,1,0],['Creamer','Dinnerware','sturdy',0.03,1,0],['Sugar Caddy','Dinnerware','sturdy',0.03,1,0]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Butter Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,7,1],['Steak Knife','Flatware','durable',0.04,7,1],['Share Spoon','Flatware','durable',0.04,3,0],['A.D. Coffee Spoon','Flatware','durable',0.04,2,0]],
+        'Misc Service': [['Sauce Boat/Ramekin','Dinnerware','sturdy',0.03,3,1],['Bottle Coaster','Service','sturdy',0.02,2,0],['Dumpling Bowl','Dinnerware','sturdy',0.03,3,1]],
+    }},
+    chinese: { name: 'Chinese / Dim Sum', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Soy Sauce Dish','Dinnerware','sturdy',0.03,12,2],['Rice Bowl','Dinnerware','sturdy',0.03,12,2],['Chopstick Rest','Dinnerware','sturdy',0.03,12,2],['Share Plate','Dinnerware','sturdy',0.03,12,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Dim Sum': [['Steamer Basket','Service','sturdy',0.02,4,1],['Small Dipping Dish','Dinnerware','sturdy',0.03,12,2],['Dim Sum Plate','Dinnerware','sturdy',0.03,6,2]],
+        'Soup & Noodles': [['Soup Bowl (Lg)','Dinnerware','sturdy',0.03,6,1],['Soup Spoon (Chinese)','Flatware','sturdy',0.03,12,2],['Noodle Bowl','Dinnerware','sturdy',0.03,6,1]],
+        'Wok & Mains': [['Serving Platter','Dinnerware','sturdy',0.03,4,1],['Sauce Boat','Dinnerware','sturdy',0.03,2,1]],
+        'Tea Service': [['Tea Pot','Glassware','sturdy',0.07,2,1],['Tea Cup','Glassware','sturdy',0.07,12,2]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,6,1],['Wine Glass (White)','Glassware','delicate',0.10,5,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,6,1],['Dinner Knife','Flatware','durable',0.04,6,1],['Dessert Spoon','Flatware','durable',0.04,6,1],['Share Spoon (Lg)','Flatware','durable',0.04,4,1]],
+    }},
+    korean: { name: 'Korean', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Rice Bowl (Metal)','Dinnerware','durable',0.02,12,2],['Banchan Dish (Sm)','Dinnerware','sturdy',0.03,10,4],['Share Plate','Dinnerware','sturdy',0.03,12,2],['Metal Chopsticks','Flatware','durable',0.02,12,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'BBQ / Grill': [['Stone Bowl (Hot)','Dinnerware','sturdy',0.02,6,1],['Grill Tongs','Service','durable',0.025,2,1],['Lettuce Plate','Dinnerware','sturdy',0.03,3,1],['Dipping Sauce Dish','Dinnerware','sturdy',0.03,6,2]],
+        'Soup & Stew': [['Soup/Stew Pot','Dinnerware','sturdy',0.02,4,1],['Soup Spoon (Long)','Flatware','durable',0.04,12,2]],
+        'Noodles': [['Noodle Bowl (Lg)','Dinnerware','sturdy',0.03,6,1]],
+        'Soju / Drinks': [['Soju Glass','Glassware','sturdy',0.07,12,2],['Beer Glass','Glassware','sturdy',0.07,6,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,6,1],['Dinner Knife','Flatware','durable',0.04,6,1],['Dessert Spoon','Flatware','durable',0.04,6,1]],
+    }},
+    indian: { name: 'Indian', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,12,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Thali Service': [['Thali Plate','Dinnerware','durable',0.02,8,1],['Katori (Sm Bowl)','Dinnerware','durable',0.02,8,2]],
+        'Curry & Mains': [['Serving Bowl (Med)','Dinnerware','sturdy',0.03,4,1],['Rice Bowl','Dinnerware','sturdy',0.03,6,1],['Ramekin/Chutney','Dinnerware','sturdy',0.03,6,2],['Sauce Boat','Dinnerware','sturdy',0.03,3,1]],
+        'Bread Service': [['Bread Basket/Plate','Dinnerware','sturdy',0.03,3,1]],
+        'Tandoor': [['Sizzler Plate','Dinnerware','durable',0.02,3,1]],
+        'Drinks': [['Lassi Glass','Glassware','sturdy',0.07,4,1],['Chai Cup','Glassware','sturdy',0.07,4,1],['Wine Glass','Glassware','delicate',0.10,6,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,6,1],['Share Spoon','Flatware','durable',0.04,4,1]],
+    }},
+    thai: { name: 'Thai / SE Asian', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['Share Plate','Dinnerware','sturdy',0.03,8,2],['Rice Bowl','Dinnerware','sturdy',0.03,12,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Soup & Curry': [['Soup Bowl (Lg)','Dinnerware','sturdy',0.03,4,1],['Curry Bowl','Dinnerware','sturdy',0.03,4,1],['Soup Spoon','Flatware','durable',0.04,12,2]],
+        'Noodles': [['Noodle Bowl','Dinnerware','sturdy',0.03,6,1]],
+        'Wok & Stir Fry': [['Serving Platter','Dinnerware','sturdy',0.03,3,1],['Dipping Sauce Dish','Dinnerware','sturdy',0.03,6,2]],
+        'Wine & Drinks': [['Wine Glass','Glassware','delicate',0.10,6,1],['Beer Glass','Glassware','sturdy',0.07,4,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Share Spoon (Lg)','Flatware','durable',0.04,4,1]],
+    }},
+    middle_eastern: { name: 'Middle Eastern / Med', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,12,2],['Share Plate','Dinnerware','sturdy',0.03,8,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Mezze': [['Mezze Plate (Sm)','Dinnerware','sturdy',0.03,8,3],['Dip Bowl','Dinnerware','sturdy',0.03,6,2],['Pita Basket','Service','sturdy',0.02,2,1]],
+        'Grill / Kebab': [['Skewer Plate','Dinnerware','sturdy',0.03,4,1],['Serving Platter','Dinnerware','sturdy',0.03,3,1]],
+        'Soup': [['Soup Bowl','Dinnerware','sturdy',0.03,4,1]],
+        'Tea & Coffee': [['Tea Glass (Sm)','Glassware','sturdy',0.07,6,1],['Turkish Coffee Cup','Glassware','sturdy',0.07,4,1]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,6,1],['Wine Glass (White)','Glassware','delicate',0.10,5,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,6,1],['Steak Knife','Flatware','durable',0.04,5,1]],
+    }},
+    mexican: { name: 'Mexican / Latin', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,8,2],['Share Plate','Dinnerware','sturdy',0.03,8,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Tacos & Antojitos': [['Taco Plate','Dinnerware','sturdy',0.03,6,2],['Salsa Bowl','Dinnerware','sturdy',0.03,4,2],['Tortilla Warmer','Service','sturdy',0.02,2,1]],
+        'Moles & Mains': [['Serving Bowl','Dinnerware','sturdy',0.03,3,1],['Rice/Beans Dish','Dinnerware','sturdy',0.03,4,1],['Ramekin/Sauce','Dinnerware','sturdy',0.03,6,2]],
+        'Soup': [['Soup Bowl','Dinnerware','sturdy',0.03,4,1]],
+        'Coffee': [['Coffee Cup','Glassware','sturdy',0.07,3,1],['Coffee Saucer','Dinnerware','sturdy',0.03,3,1]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,5,1],['Wine Glass (White)','Glassware','delicate',0.10,4,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,6,1],['Steak Knife','Flatware','durable',0.04,6,1]],
+    }},
+    italian: { name: 'Italian', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,12,2],['Olive Oil Dish','Dinnerware','sturdy',0.03,2,1],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Antipasti': [['Share Plate','Dinnerware','sturdy',0.03,8,2],['Small Bowl','Dinnerware','sturdy',0.03,4,1]],
+        'Pasta': [['Pasta Bowl','Dinnerware','sturdy',0.03,10,2]],
+        'Mains & Grill': [['Serving Platter','Dinnerware','sturdy',0.03,3,1],['Ramekin','Dinnerware','sturdy',0.03,4,1],['Steak Knife','Flatware','durable',0.04,6,1]],
+        'Soup & Salad': [['Soup Bowl','Dinnerware','sturdy',0.03,4,1],['Salad Plate','Dinnerware','sturdy',0.03,8,2]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,8,2],['Wine Glass (White)','Glassware','delicate',0.10,6,1],['Wine Carafe','Glassware','sturdy',0.07,2,1]],
+        'Coffee & Espresso': [['Espresso Cup','Glassware','sturdy',0.07,4,1],['Espresso Saucer','Dinnerware','sturdy',0.03,4,1],['Creamer','Dinnerware','sturdy',0.03,1,1],['Sugar Caddy','Dinnerware','sturdy',0.03,1,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Pasta Fork','Flatware','durable',0.04,10,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,4,1],['Butter Knife','Flatware','durable',0.04,12,2]],
+    }},
+    french: { name: 'French', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Dinner Plate','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,12,2],['Butter Dish','Dinnerware','sturdy',0.03,2,1],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Appetizers': [['Salad Plate','Dinnerware','sturdy',0.03,10,2],['Escargot Plate','Dinnerware','sturdy',0.03,3,1],['Ramekin','Dinnerware','sturdy',0.03,4,1]],
+        'Soup': [['Soup Bowl','Dinnerware','sturdy',0.03,6,1],['Soup Cup & Saucer','Dinnerware','sturdy',0.03,4,1]],
+        'Mains': [['Serving Platter','Dinnerware','sturdy',0.03,3,1],['Sauce Boat','Dinnerware','sturdy',0.03,2,1],['Steak Knife','Flatware','durable',0.04,6,1]],
+        'Cheese & Dessert': [['Cheese Board','Dinnerware','sturdy',0.02,2,1],['Dessert Plate','Dinnerware','sturdy',0.03,8,1]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,8,2],['Wine Glass (White)','Glassware','delicate',0.10,6,2],['Champagne Flute','Glassware','delicate',0.10,4,1],['Wine Carafe','Glassware','sturdy',0.07,2,1]],
+        'Coffee': [['Coffee Cup','Glassware','sturdy',0.07,4,1],['Coffee Saucer','Dinnerware','sturdy',0.03,4,1],['Creamer','Dinnerware','sturdy',0.03,1,1],['Sugar Caddy','Dinnerware','sturdy',0.03,1,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Salad Fork','Flatware','durable',0.04,10,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Butter Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,6,1],['Escargot Fork','Flatware','durable',0.04,3,1]],
+    }},
+    steakhouse: { name: 'American / Steakhouse', sections: {
+        'Core Service': [['Water Glass','Glassware','sturdy',0.07,12,2],['Water Pitcher','Glassware','sturdy',0.03,1,1],['Dinner Plate (Lg)','Dinnerware','sturdy',0.03,12,2],['B&B Plate','Dinnerware','sturdy',0.03,12,2],['Check Presenter','Service','sturdy',0.02,1,1]],
+        'Apps & Salads': [['Salad Plate','Dinnerware','sturdy',0.03,8,2],['Share Plate','Dinnerware','sturdy',0.03,6,2],['Ramekin','Dinnerware','sturdy',0.03,6,2]],
+        'Steaks & Mains': [['Steak Plate (Oval)','Dinnerware','sturdy',0.03,8,2],['Steak Knife','Flatware','durable',0.04,10,2],['Sauce Boat','Dinnerware','sturdy',0.03,3,1]],
+        'Sides': [['Side Dish Bowl','Dinnerware','sturdy',0.03,6,2]],
+        'Soup': [['Soup Bowl','Dinnerware','sturdy',0.03,4,1]],
+        'Wine Service': [['Wine Glass (Red)','Glassware','delicate',0.10,8,2],['Wine Glass (White)','Glassware','delicate',0.10,5,1]],
+        'Coffee': [['Coffee Cup','Glassware','sturdy',0.07,4,1],['Coffee Saucer','Dinnerware','sturdy',0.03,4,1],['Creamer','Dinnerware','sturdy',0.03,1,1],['Sugar Caddy','Dinnerware','sturdy',0.03,1,1]],
+        'Flatware': [['Dinner Fork','Flatware','durable',0.04,12,2],['Salad Fork','Flatware','durable',0.04,8,2],['Dinner Knife','Flatware','durable',0.04,12,2],['Butter Knife','Flatware','durable',0.04,12,2],['Dessert Spoon','Flatware','durable',0.04,8,1],['Soup Spoon','Flatware','durable',0.04,4,1]],
+    }},
+};
 
 let npItemCount = 0;
+let activeSections = {};
+let lastNewParResults = null;
 
-function initNpItems() {
-    const container = document.getElementById('np-items-list');
-    if (!container) return;
-    // Add header
-    container.innerHTML = `<div style="display:grid;grid-template-columns:1fr 120px 90px 90px 80px 80px 40px;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">
-        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Item Name</span>
-        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Category</span>
-        <span style="font-size:0.68rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">Lg Table</span>
-        <span style="font-size:0.68rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">Sm Table</span>
-        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Type</span>
-        <span style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Attrition</span>
-        <span></span>
-    </div>`;
-    NP_DEFAULT_ITEMS.forEach(item => addNpItem(item.name, item.category, item.lgQty, item.smQty, item.type, item.attrition));
+function loadCuisinePreset() {
+    const cuisine = document.getElementById('np-cuisine').value;
+    if (!cuisine) { ['np-sections-card','np-items-card','np-run-btn'].forEach(id => document.getElementById(id).style.display='none'); return; }
+    const preset = CUISINE_PRESETS[cuisine];
+    activeSections = {};
+    const sd = document.getElementById('np-sections');
+    sd.innerHTML = '';
+    Object.keys(preset.sections).forEach(section => {
+        activeSections[section] = true;
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary';
+        btn.style.cssText = 'border-color:var(--accent);color:var(--accent);font-size:0.82rem';
+        btn.textContent = section;
+        btn.onclick = () => { activeSections[section]=!activeSections[section]; btn.style.borderColor=activeSections[section]?'var(--accent)':'var(--border)'; btn.style.color=activeSections[section]?'var(--accent)':'var(--text-dim)'; btn.style.opacity=activeSections[section]?'1':'0.5'; rebuildItems(cuisine); };
+        sd.appendChild(btn);
+    });
+    rebuildItems(cuisine);
+    ['np-sections-card','np-items-card','np-run-btn'].forEach(id => document.getElementById(id).style.display='');
 }
 
-function addNpItem(name='', category='Glassware', lgQty='', smQty='', type='sturdy', attrition=0.07) {
-    npItemCount++;
-    const id = npItemCount;
-    const container = document.getElementById('np-items-list');
-    const row = document.createElement('div');
-    row.id = `np-item-${id}`;
-    row.className = 'np-item-row';
-    row.style.cssText = 'display:grid;grid-template-columns:1fr 120px 90px 90px 80px 80px 40px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)';
-    row.innerHTML = `
-        <input type="text" value="${name}" data-field="name" placeholder="Item name" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'DM Sans';font-size:0.85rem;width:100%">
-        <select data-field="category" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'DM Sans';font-size:0.8rem;width:100%">
-            <option value="Glassware" ${category==='Glassware'?'selected':''}>Glassware</option>
-            <option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option>
-            <option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option>
-            <option value="Service" ${category==='Service'?'selected':''}>Service</option>
-            <option value="Bar Tools" ${category==='Bar Tools'?'selected':''}>Bar Tools</option>
-        </select>
-        <input type="number" value="${lgQty}" data-field="lgQty" min="0" step="1" style="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:8px;color:var(--accent);font-family:'DM Sans';font-size:0.88rem;width:100%;text-align:center;font-weight:600">
-        <input type="number" value="${smQty}" data-field="smQty" min="0" step="1" style="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:8px;color:var(--accent);font-family:'DM Sans';font-size:0.88rem;width:100%;text-align:center;font-weight:600">
-        <select data-field="type" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text-muted);font-family:'DM Sans';font-size:0.78rem;width:100%">
-            <option value="delicate" ${type==='delicate'?'selected':''}>Delicate</option>
-            <option value="sturdy" ${type==='sturdy'?'selected':''}>Sturdy</option>
-            <option value="durable" ${type==='durable'?'selected':''}>Durable</option>
-        </select>
-        <select data-field="attrition" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text-muted);font-family:'DM Sans';font-size:0.78rem;width:100%">
-            <option value="0.10" ${attrition==0.10?'selected':''}>10%</option>
-            <option value="0.07" ${attrition==0.07?'selected':''}>7%</option>
-            <option value="0.04" ${attrition==0.04?'selected':''}>4%</option>
-            <option value="0.03" ${attrition==0.03?'selected':''}>3%</option>
-            <option value="0.025" ${attrition==0.025?'selected':''}>2.5%</option>
-            <option value="0.02" ${attrition==0.02?'selected':''}>2%</option>
-        </select>
-        <button class="btn btn-danger" onclick="document.getElementById('np-item-${id}').remove()">×</button>
-    `;
-    container.appendChild(row);
+function rebuildItems(cuisine) {
+    const p = CUISINE_PRESETS[cuisine]; const c = document.getElementById('np-items-list');
+    c.innerHTML = '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+    npItemCount = 0;
+    Object.entries(p.sections).forEach(([sec, items]) => { if (!activeSections[sec]) return; items.forEach(([n,cat,t,a,lg,sm]) => addNpItem(n,cat,lg,sm,t,a,sec,'')); });
+}
+
+function addNpItem(name='',category='Glassware',lgQty='',smQty='',type='sturdy',attrition=0.07,section='Custom',override='') {
+    npItemCount++; const id=npItemCount; const c=document.getElementById('np-items-list');
+    const row=document.createElement('div'); row.id=`np-item-${id}`; row.className='np-item-row';
+    row.style.cssText='display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)';
+    const s="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-family:'DM Sans';font-size:0.8rem;width:100%";
+    const a="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:6px;color:var(--accent);font-family:'DM Sans';font-size:0.82rem;width:100%;text-align:center;font-weight:600";
+    const o="background:var(--surface-2);border:1px solid rgba(255,152,0,0.3);border-radius:6px;padding:6px;color:var(--warn);font-family:'DM Sans';font-size:0.82rem;width:100%;text-align:center;font-weight:600";
+    row.innerHTML=`<input type="text" value="${name}" data-field="name" style="${s}"><select data-field="category" style="${s};font-size:0.75rem"><option value="Glassware" ${category==='Glassware'?'selected':''}>Glassware</option><option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option><option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option><option value="Service" ${category==='Service'?'selected':''}>Service</option></select><div style="font-size:0.7rem;color:var(--text-dim);padding:0 2px">${section}</div><input type="number" value="${lgQty}" data-field="lgQty" min="0" step="1" style="${a}"><input type="number" value="${smQty}" data-field="smQty" min="0" step="1" style="${a}"><select data-field="type" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="delicate" ${type==='delicate'?'selected':''}>Delicate</option><option value="sturdy" ${type==='sturdy'?'selected':''}>Sturdy</option><option value="durable" ${type==='durable'?'selected':''}>Durable</option></select><select data-field="attrition" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="0.10" ${attrition==0.10?'selected':''}>10%</option><option value="0.07" ${attrition==0.07?'selected':''}>7%</option><option value="0.04" ${attrition==0.04?'selected':''}>4%</option><option value="0.03" ${attrition==0.03?'selected':''}>3%</option><option value="0.025" ${attrition==0.025?'selected':''}>2.5%</option><option value="0.02" ${attrition==0.02?'selected':''}>2%</option></select><input type="number" value="${override}" data-field="override" min="0" step="1" placeholder="—" style="${o}"><button class="btn btn-danger" onclick="document.getElementById('np-item-${id}').remove()">×</button>`;
+    c.appendChild(row);
+}
+
+// ─── CSV/Excel Import ───
+async function importBible() {
+    const fileInput = document.getElementById('np-file-input');
+    const status = document.getElementById('np-import-status');
+    if (!fileInput.files.length) { status.textContent = 'No file selected.'; return; }
+    const file = fileInput.files[0];
+    status.textContent = 'Reading file...';
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, {type:'array'});
+        const items = [];
+        const catMap = {'smallware':'Flatware','plateware':'Dinnerware','glassware':'Glassware','collateral':'Service','barware':'Service'};
+        workbook.SheetNames.forEach(sheetName => {
+            const ws = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+            const cat = catMap[sheetName.toLowerCase()] || 'Service';
+            rows.forEach(row => {
+                const name = row[1] ? String(row[1]).trim() : '';
+                if (!name || name==='Item' || name.length < 2) return;
+                let qty = '';
+                for (let i = 7; i >= 5; i--) {
+                    if (row[i]) { const v = String(row[i]).trim(); const n = parseInt(v); if (!isNaN(n) && n > 0) { qty = n; break; } }
+                }
+                if (qty) items.push({name, category: cat, qty});
+            });
+        });
+        // Show items and build into the list
+        const c = document.getElementById('np-items-list');
+        c.innerHTML = '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+        npItemCount = 0;
+        items.forEach(i => {
+            const type = i.category==='Glassware'?'sturdy':i.category==='Flatware'?'durable':'sturdy';
+            const attr = i.category==='Glassware'?0.07:i.category==='Flatware'?0.04:0.03;
+            addNpItem(i.name, i.category, '', '', type, attr, 'Imported', i.qty);
+        });
+        status.innerHTML = `<span style="color:var(--success)">✓ Imported ${items.length} items from ${workbook.SheetNames.length} sheets.</span> Per-table quantities are blank — set them or use overrides.`;
+        ['np-items-card','np-run-btn'].forEach(id => document.getElementById(id).style.display='');
+    } catch(e) { status.textContent = 'Error: ' + e.message; }
 }
 
 function runNewPar() {
-    const venueName = document.getElementById('np-venue').value || 'New Venue';
-    const seats = parseFloat(document.getElementById('np-seats').value) || 123;
-    const tables = parseFloat(document.getElementById('np-tables').value) || 30;
-    const covers = parseFloat(document.getElementById('np-covers').value) || 350;
-    const lgTable = parseFloat(document.getElementById('np-largest').value) || 12;
-    const smTable = parseFloat(document.getElementById('np-smallest').value) || 2;
-    const avgPerTable = covers / tables;
+    const vn=document.getElementById('np-venue').value||'New Venue';
+    const seats=parseFloat(document.getElementById('np-seats').value)||123;
+    const tables=parseFloat(document.getElementById('np-tables').value)||30;
+    const covers=parseFloat(document.getElementById('np-covers').value)||350;
+    const lgT=parseFloat(document.getElementById('np-largest').value)||12;
+    const smT=parseFloat(document.getElementById('np-smallest').value)||2;
+    const apt=covers/tables;
+    const cuisine=document.getElementById('np-cuisine').value;
+    const cn=cuisine?CUISINE_PRESETS[cuisine].name:'Custom';
+    const BUF={delicate:2.0,sturdy:1.5,durable:1.5};
+    const WASH={delicate:0.40,sturdy:0.23,durable:0.14};
+    const rows=document.querySelectorAll('.np-item-row');
+    const items=[];
+    rows.forEach(r=>{
+        const n=r.querySelector('[data-field="name"]').value.trim();
+        const cat=r.querySelector('[data-field="category"]').value;
+        const lg=parseFloat(r.querySelector('[data-field="lgQty"]').value)||0;
+        const sm=parseFloat(r.querySelector('[data-field="smQty"]').value)||0;
+        const tp=r.querySelector('[data-field="type"]').value;
+        const at=parseFloat(r.querySelector('[data-field="attrition"]').value)||0.07;
+        const ov=r.querySelector('[data-field="override"]').value.trim();
+        const override = ov!=='' ? parseInt(ov) : null;
+        if(!n) return;
+        let ratio=0, avgQty=0;
+        if(lg>0||sm>0){const sl=(lg-sm)/(lgT-smT); avgQty=sm+sl*(apt-smT); ratio=avgQty/apt;}
+        items.push({name:n,category:cat,lgQty:lg,smQty:sm,avgQty,ratio,type:tp,attrition:at,override});
+    });
+    if(items.length===0){alert('Add at least one item.');return;}
 
-    // Buffer multipliers
-    const BUF = { delicate: 2.0, sturdy: 1.5, durable: 1.5 };
-    const WASH = { delicate: 0.40, sturdy: 0.23, durable: 0.14 };
+    // Build results
+    let h=`<div class="card" style="margin-top:24px"><div class="card-title">${vn} <span class="badge">${cn}</span></div>
+    <div style="display:flex;gap:20px;font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap"><span><strong style="color:var(--text)">${seats}</strong> seats</span><span><strong style="color:var(--text)">${tables}</strong> tables</span><span><strong style="color:var(--text)">${covers}</strong> covers/night</span><span>Avg/tbl: <strong style="color:var(--text)">${apt.toFixed(1)}</strong></span></div>
+    <div style="margin-bottom:12px"><button class="btn btn-secondary" onclick="exportToExcel()" style="font-size:0.82rem">📥 Export to Excel</button></div>
+    <table class="result-table"><tr><th>Item</th><th style="text-align:center">3-PAR</th><th style="text-align:center">P+B</th><th style="text-align:center">Suggested</th><th style="text-align:center">Override</th><th style="text-align:center;color:var(--accent)">Final PAR</th><th>Repl/mo</th></tr>`;
 
-    // Read all items
-    const rows = document.querySelectorAll('.np-item-row');
-    const items = [];
-    rows.forEach(row => {
-        const name = row.querySelector('[data-field="name"]').value.trim();
-        const category = row.querySelector('[data-field="category"]').value;
-        const lgQty = parseFloat(row.querySelector('[data-field="lgQty"]').value) || 0;
-        const smQty = parseFloat(row.querySelector('[data-field="smQty"]').value) || 0;
-        const type = row.querySelector('[data-field="type"]').value;
-        const attrition = parseFloat(row.querySelector('[data-field="attrition"]').value) || 0.07;
-        if (name && (lgQty > 0 || smQty > 0)) {
-            items.push({ name, category, lgQty, smQty, type, attrition });
+    let ct='',tS=0,tF=0,tR=0;
+    const exportData = [];
+
+    items.forEach(i=>{
+        if(i.category!==ct){ct=i.category;h+=`<tr><td colspan="7" style="padding:10px 14px;font-size:0.75rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${ct}</strong></td></tr>`;}
+        let tp=0,pb=0,sg=0;
+        if(i.ratio>0){
+            const bpt=i.type==='delicate'?2:4;
+            const p1=Math.ceil(covers*i.ratio*0.71);const p2=Math.ceil(tables*bpt*i.ratio);const p3=Math.ceil(p1*WASH[i.type]);
+            tp=p1+p2+p3;const pk=Math.ceil(covers*i.ratio*0.85);pb=Math.ceil(pk*BUF[i.type]);sg=Math.ceil((tp+pb)/2/5)*5;
         }
+        const finalPar = i.override !== null ? i.override : sg;
+        const isOverride = i.override !== null;
+        const rp = Math.ceil(finalPar * i.attrition);
+        tS+=sg; tF+=finalPar; tR+=rp;
+        exportData.push({name:i.name, category:i.category, type:i.type, lgQty:i.lgQty, smQty:i.smQty, threePar:tp, peakBuf:pb, suggested:sg, override:i.override, finalPar, repl:rp});
+
+        const overrideCell = isOverride ? `<strong style="color:var(--warn)">${i.override}</strong>` : '<span class="muted">—</span>';
+        const finalStyle = isOverride ? 'background:rgba(255,152,0,0.1);color:var(--warn)' : 'color:var(--accent)';
+        const finalTag = isOverride ? ' <span style="font-size:0.6rem;background:var(--warn-bg);color:var(--warn);padding:1px 5px;border-radius:3px">MANUAL</span>' : '';
+        h+=`<tr><td><strong>${i.name}</strong><br><span class="muted" style="font-size:0.7rem">${i.type} · ${(i.attrition*100)}%</span></td>
+        <td style="text-align:center">${tp||'—'}</td><td style="text-align:center">${pb||'—'}</td>
+        <td style="text-align:center">${sg||'—'}</td><td style="text-align:center">${overrideCell}</td>
+        <td style="text-align:center;${finalStyle}"><strong>${finalPar}</strong>${finalTag}</td><td class="muted">${rp}</td></tr>`;
     });
 
-    if (items.length === 0) { alert('Add at least one item.'); return; }
+    h+=`<tr style="border-top:2px solid var(--border-light)"><td colspan="3"><strong>TOTALS</strong></td><td style="text-align:center"><strong>${tS}</strong></td><td></td><td style="text-align:center" class="highlight"><strong>${tF}</strong></td><td class="muted"><strong>${tR}</strong></td></tr></table></div>`;
 
-    // ── Calculate per-guest ratio from table inputs ──
-    // Interpolate: ratio = qty_per_avg_table / avg_table_size
-    // Linear interpolation between small and large table
-    items.forEach(item => {
-        // Qty for average table size (interpolate between small and large)
-        const slope = (item.lgQty - item.smQty) / (lgTable - smTable);
-        item.avgQty = item.smQty + slope * (avgPerTable - smTable);
-        item.ratio = item.avgQty / avgPerTable;
-    });
-
-    let html = '';
-
-    // Venue summary
-    html += `<div class="card" style="margin-top:24px">
-        <div class="card-title">${venueName} <span class="badge">Initial PAR Setup</span></div>
-        <div style="display:flex;gap:24px;font-size:0.88rem;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap">
-            <span><strong style="color:var(--text)">${seats}</strong> seats</span>
-            <span><strong style="color:var(--text)">${tables}</strong> tables</span>
-            <span><strong style="color:var(--text)">${covers}</strong> covers/night</span>
-            <span>Lg table: <strong style="color:var(--text)">${lgTable}</strong></span>
-            <span>Sm table: <strong style="color:var(--text)">${smTable}</strong></span>
-            <span>Avg covers/table: <strong style="color:var(--text)">${avgPerTable.toFixed(1)}</strong></span>
-        </div>`;
-
-    // Results table
-    html += `<table class="result-table">
-        <tr>
-            <th>Item</th>
-            <th style="text-align:center">Lg Tbl<br><span style="font-weight:400">(${lgTable})</span></th>
-            <th style="text-align:center">Sm Tbl<br><span style="font-weight:400">(${smTable})</span></th>
-            <th style="text-align:center">Avg Tbl<br><span style="font-weight:400">(${avgPerTable.toFixed(0)})</span></th>
-            <th style="text-align:center">PAR 1<br><span style="font-weight:400;font-size:0.6rem">Floor</span></th>
-            <th style="text-align:center">PAR 2<br><span style="font-weight:400;font-size:0.6rem">Backup</span></th>
-            <th style="text-align:center">PAR 3<br><span style="font-weight:400;font-size:0.6rem">Wash</span></th>
-            <th style="text-align:center">Three-PAR</th>
-            <th style="text-align:center">Peak+Buf</th>
-            <th style="text-align:center;color:var(--accent)">Suggested</th>
-            <th>Repl/mo</th>
-        </tr>`;
-
-    let currentCat = '';
-    let totalTP = 0, totalPB = 0, totalSugg = 0, totalRepl = 0;
-
-    items.forEach(item => {
-        if (item.category !== currentCat) {
-            currentCat = item.category;
-            html += `<tr><td colspan="11" style="padding:12px 14px;font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${currentCat}</strong></td></tr>`;
-        }
-
-        const wash = WASH[item.type];
-        const buf = BUF[item.type];
-        const backupPerTable = item.type === 'delicate' ? 2 : 4;
-
-        // Three-PAR
-        const par1 = Math.ceil(covers * item.ratio * 0.71);
-        const par2 = Math.ceil(tables * backupPerTable * item.ratio);
-        const par3 = Math.ceil(par1 * wash);
-        const threePar = par1 + par2 + par3;
-
-        // Peak + Buffer
-        const peak = Math.ceil(covers * item.ratio * 0.85);
-        const peakBuf = Math.ceil(peak * buf);
-
-        // Suggested: average rounded to nearest 5
-        const suggested = Math.ceil((threePar + peakBuf) / 2 / 5) * 5;
-        const repl = Math.ceil(suggested * item.attrition);
-
-        totalTP += threePar;
-        totalPB += peakBuf;
-        totalSugg += suggested;
-        totalRepl += repl;
-
-        html += `<tr>
-            <td><strong>${item.name}</strong><br><span class="muted" style="font-size:0.72rem">${item.type} · ${(item.attrition*100)}%/mo</span></td>
-            <td style="text-align:center">${item.lgQty}</td>
-            <td style="text-align:center">${item.smQty}</td>
-            <td style="text-align:center">${item.avgQty.toFixed(1)}</td>
-            <td style="text-align:center">${par1}</td>
-            <td style="text-align:center">${par2}</td>
-            <td style="text-align:center">${par3}</td>
-            <td style="text-align:center"><strong>${threePar}</strong></td>
-            <td style="text-align:center"><strong>${peakBuf}</strong></td>
-            <td style="text-align:center" class="highlight"><strong>${suggested}</strong></td>
-            <td class="muted">${repl}</td>
-        </tr>`;
-    });
-
-    html += `<tr style="border-top:2px solid var(--border-light)">
-        <td colspan="7"><strong>TOTALS</strong></td>
-        <td style="text-align:center"><strong>${totalTP}</strong></td>
-        <td style="text-align:center"><strong>${totalPB}</strong></td>
-        <td style="text-align:center" class="highlight"><strong>${totalSugg}</strong></td>
-        <td class="muted"><strong>${totalRepl}</strong></td>
-    </tr></table></div>`;
-
-    // How it works
-    html += `<div class="card">
-        <div class="card-title">How It Works</div>
-        <div class="par-detail-grid">
-            <div>
-                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Table → Ratio Conversion</div>
-                <div class="par-detail-item"><span class="label">Input</span><span class="value">Qty for large table (${lgTable}) & small table (${smTable})</span></div>
-                <div class="par-detail-item"><span class="label">Interpolation</span><span class="value">Linear scale to avg table (${avgPerTable.toFixed(1)} covers)</span></div>
-                <div class="par-detail-item"><span class="label">Per-guest ratio</span><span class="value">Avg table qty ÷ avg table size</span></div>
-            </div>
-            <div>
-                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">PAR Calculation</div>
-                <div class="par-detail-item"><span class="label">PAR 1 (Floor)</span><span class="value">71% of covers × ratio</span></div>
-                <div class="par-detail-item"><span class="label">PAR 2 (Backup)</span><span class="value">Tables × backup per table × ratio</span></div>
-                <div class="par-detail-item"><span class="label">PAR 3 (Wash)</span><span class="value">PAR 1 × wash cycle %</span></div>
-                <div class="par-detail-item"><span class="label">Suggested</span><span class="value">Average of Three-PAR & Peak+Buffer, round to 5</span></div>
-            </div>
-        </div>
-    </div>`;
-
-    document.getElementById('newpar-results').innerHTML = html;
+    lastNewParResults = {venueName:vn, cuisine:cn, seats, tables, covers, items: exportData};
+    document.getElementById('newpar-results').innerHTML=h;
 }
 
-// Initialize
-initNpItems();
+// ─── Excel Export ───
+function exportToExcel() {
+    if (!lastNewParResults) { alert('Run the calculation first.'); return; }
+    const r = lastNewParResults;
+    const wb = XLSX.utils.book_new();
+
+    // Summary sheet
+    const summaryData = [
+        ['THE h.wood GROUP — PAR Setup Report'],
+        [],
+        ['Venue', r.venueName],
+        ['Cuisine', r.cuisine],
+        ['Seats', r.seats],
+        ['Tables', r.tables],
+        ['Covers/Night', r.covers],
+        [],
+        ['Item', 'Category', 'Type', 'Lg Tbl', 'Sm Tbl', 'Three-PAR', 'Peak+Buf', 'Suggested', 'Override', 'Final PAR', 'Monthly Repl.'],
+    ];
+
+    let currentCat = '';
+    let catTotals = {};
+    r.items.forEach(i => {
+        if (i.category !== currentCat) {
+            if (currentCat) summaryData.push([]);
+            currentCat = i.category;
+            summaryData.push([currentCat.toUpperCase(), '', '', '', '', '', '', '', '', '', '']);
+        }
+        summaryData.push([i.name, i.category, i.type, i.lgQty||'', i.smQty||'', i.threePar||'', i.peakBuf||'', i.suggested||'', i.override!==null?i.override:'', i.finalPar, i.repl]);
+        if (!catTotals[i.category]) catTotals[i.category] = {par:0, repl:0, count:0};
+        catTotals[i.category].par += i.finalPar;
+        catTotals[i.category].repl += i.repl;
+        catTotals[i.category].count++;
+    });
+
+    summaryData.push([]);
+    const totalPar = r.items.reduce((s,i)=>s+i.finalPar,0);
+    const totalRepl = r.items.reduce((s,i)=>s+i.repl,0);
+    summaryData.push(['TOTAL', '', '', '', '', '', '', '', '', totalPar, totalRepl]);
+
+    const ws = XLSX.utils.aoa_to_sheet(summaryData);
+    ws['!cols'] = [{wch:30},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, 'PAR Setup');
+
+    // Category summary sheet
+    const catData = [['Category Summary'], [], ['Category', 'Items', 'Total PAR', 'Monthly Replacement']];
+    Object.entries(catTotals).forEach(([cat, v]) => catData.push([cat, v.count, v.par, v.repl]));
+    catData.push([], ['TOTAL', r.items.length, totalPar, totalRepl]);
+    const ws2 = XLSX.utils.aoa_to_sheet(catData);
+    ws2['!cols'] = [{wch:20},{wch:8},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+    XLSX.writeFile(wb, `${r.venueName.replace(/[^a-zA-Z0-9]/g,'_')}_PAR_Setup.xlsx`);
+}
 </script>
-</body>
-</html>
+</body></html>
