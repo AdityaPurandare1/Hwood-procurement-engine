@@ -1165,6 +1165,7 @@
                 <button class="btn btn-secondary" onclick="bulkSetSmTable()" style="font-size:0.8rem">Set All Sm Table</button>
                 <button class="btn btn-secondary" onclick="bulkSetTablesByCategory()" style="font-size:0.8rem;border-color:var(--accent);color:var(--accent)">Set Tables by Category</button>
                 <button class="btn btn-secondary" onclick="bulkRemoveEmpty()" style="font-size:0.8rem;border-color:var(--danger);color:var(--danger)">Remove Empty Items</button>
+                <button class="btn btn-secondary" onclick="bulkSetReplacePC()" style="font-size:0.8rem;border-color:var(--accent);color:var(--accent)">Set Replace/Course</button>
             </div>
         </div>
 
@@ -2424,22 +2425,22 @@ function rebuildItems(cuisine) {
     const p = CUISINE_PRESETS[cuisine]; const c = document.getElementById('np-items-list');
     c.innerHTML = npItemsHeader();
     npItemCount = 0;
-    Object.entries(p.sections).forEach(([sec, items]) => { if (!activeSections[sec]) return; items.forEach(([n,cat,t,a,lg,sm]) => addNpItem(n,cat,lg,sm,t,a,sec,'')); });
+    Object.entries(p.sections).forEach(([sec, items]) => { if (!activeSections[sec]) return; items.forEach(([n,cat,t,a,lg,sm,rpc]) => addNpItem(n,cat,lg,sm,t,a,sec,'',rpc||'no')); });
 }
 
-function addNpItem(name='',category='Glassware',lgQty='',smQty='',type='sturdy',attrition=0.07,section='Custom',override='') {
+function addNpItem(name='',category='Glassware',lgQty='',smQty='',type='sturdy',attrition=0.07,section='Custom',override='',replacePC='no') {
     npItemCount++; const id=npItemCount; const c=document.getElementById('np-items-list');
     const row=document.createElement('div'); row.id=`np-item-${id}`; row.className='np-item-row';
-    row.style.cssText='display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)';
+    row.style.cssText='display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 50px 90px 40px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)';
     const s="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-family:'DM Sans';font-size:0.8rem;width:100%";
     const a="background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:6px;padding:6px;color:var(--accent);font-family:'DM Sans';font-size:0.82rem;width:100%;text-align:center;font-weight:600";
     const o="background:var(--surface-2);border:1px solid rgba(255,152,0,0.3);border-radius:6px;padding:6px;color:var(--warn);font-family:'DM Sans';font-size:0.82rem;width:100%;text-align:center;font-weight:600";
-    row.innerHTML=`<input type="text" value="${name}" data-field="name" style="${s}"><select data-field="category" style="${s};font-size:0.75rem"><option value="Glassware" ${category==='Glassware'?'selected':''}>Glassware</option><option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option><option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option><option value="Service" ${category==='Service'?'selected':''}>Service</option></select><div style="font-size:0.7rem;color:var(--text-dim);padding:0 2px">${section}</div><input type="number" value="${lgQty}" data-field="lgQty" min="0" step="1" style="${a}"><input type="number" value="${smQty}" data-field="smQty" min="0" step="1" style="${a}"><select data-field="type" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="delicate" ${type==='delicate'?'selected':''}>Delicate</option><option value="sturdy" ${type==='sturdy'?'selected':''}>Sturdy</option><option value="durable" ${type==='durable'?'selected':''}>Durable</option></select><select data-field="attrition" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="0.10" ${attrition==0.10?'selected':''}>10%</option><option value="0.07" ${attrition==0.07?'selected':''}>7%</option><option value="0.04" ${attrition==0.04?'selected':''}>4%</option><option value="0.03" ${attrition==0.03?'selected':''}>3%</option><option value="0.025" ${attrition==0.025?'selected':''}>2.5%</option><option value="0.02" ${attrition==0.02?'selected':''}>2%</option></select><input type="number" value="${override}" data-field="override" min="0" step="1" placeholder="—" style="${o}"><button class="btn btn-danger" onclick="document.getElementById('np-item-${id}').remove()">×</button>`;
+    row.innerHTML=`<input type="text" value="${name}" data-field="name" style="${s}"><select data-field="category" style="${s};font-size:0.75rem"><option value="Glassware" ${category==='Glassware'?'selected':''}>Glassware</option><option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option><option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option><option value="Service" ${category==='Service'?'selected':''}>Service</option></select><div style="font-size:0.7rem;color:var(--text-dim);padding:0 2px">${section}</div><input type="number" value="${lgQty}" data-field="lgQty" min="0" step="1" style="${a}"><input type="number" value="${smQty}" data-field="smQty" min="0" step="1" style="${a}"><select data-field="type" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="delicate" ${type==='delicate'?'selected':''}>Delicate</option><option value="sturdy" ${type==='sturdy'?'selected':''}>Sturdy</option><option value="durable" ${type==='durable'?'selected':''}>Durable</option></select><select data-field="attrition" style="${s};font-size:0.72rem;color:var(--text-muted)"><option value="0.10" ${attrition==0.10?'selected':''}>10%</option><option value="0.07" ${attrition==0.07?'selected':''}>7%</option><option value="0.04" ${attrition==0.04?'selected':''}>4%</option><option value="0.03" ${attrition==0.03?'selected':''}>3%</option><option value="0.025" ${attrition==0.025?'selected':''}>2.5%</option><option value="0.02" ${attrition==0.02?'selected':''}>2%</option></select><select data-field="replacePC" style="${s};font-size:0.72rem;color:${replacePC==='yes'?'var(--accent)':'var(--text-muted)'}"><option value="no" ${replacePC!=='yes'?'selected':''}>No</option><option value="yes" ${replacePC==='yes'?'selected':''}>Yes</option></select><input type="number" value="${override}" data-field="override" min="0" step="1" placeholder="—" style="${o}"><button class="btn btn-danger" onclick="document.getElementById('np-item-${id}').remove()">×</button>`;
     c.appendChild(row);
 }
 
 function npItemsHeader() {
-    return '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
+    return '<div style="display:grid;grid-template-columns:1fr 90px 90px 70px 70px 70px 70px 50px 90px 40px;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Item</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Section</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Lg Tbl</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Sm Tbl</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Type</span><span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Attrition</span><span style="font-size:0.65rem;color:var(--accent);text-transform:uppercase">Repl/C</span><span style="font-size:0.65rem;color:var(--warn);text-transform:uppercase">Override</span><span></span></div>';
 }
 
 // ─── Bulk Edit Functions ───
@@ -2487,6 +2488,22 @@ function bulkRemoveEmpty() {
         const sm = row.querySelector('[data-field="smQty"]').value.trim();
         const ov = row.querySelector('[data-field="override"]').value.trim();
         if (!lg && !sm && !ov) row.remove();
+    });
+}
+
+function bulkSetReplacePC() {
+    const cat = prompt('Set "Replace per Course" for which category?\n(Flatware / Dinnerware / Glassware / Service / ALL)');
+    if (!cat) return;
+    const val = prompt('Set to Yes or No?');
+    if (!val) return;
+    const setVal = val.toLowerCase().startsWith('y') ? 'yes' : 'no';
+    const filterCat = cat.trim().toUpperCase();
+    document.querySelectorAll('.np-item-row').forEach(row => {
+        const rowCat = row.querySelector('[data-field="category"]').value;
+        if (filterCat === 'ALL' || rowCat.toUpperCase() === filterCat) {
+            row.querySelector('[data-field="replacePC"]').value = setVal;
+            row.querySelector('[data-field="replacePC"]').style.color = setVal === 'yes' ? 'var(--accent)' : 'var(--text-muted)';
+        }
     });
 }
 
@@ -2588,13 +2605,13 @@ function runNewPar() {
         const tp=r.querySelector('[data-field="type"]').value;
         const at=parseFloat(r.querySelector('[data-field="attrition"]').value)||0.07;
         const ov=r.querySelector('[data-field="override"]').value.trim();
+        const replacePC=r.querySelector('[data-field="replacePC"]').value;
         const override = ov!=='' ? parseInt(ov) : null;
         if(!n) return;
-        // Multi-course: flatware and dinnerware get multiplied by courses
+        // Multi-course: only items marked "Yes" for Replace/Course get multiplied
         let courseMult = 1;
-        if (serviceStyle === 'multi' && avgCourses > 1) {
-            const isReplaced = (cat === 'Flatware' || cat === 'Dinnerware');
-            courseMult = isReplaced ? avgCourses : 1;
+        if (serviceStyle === 'multi' && avgCourses > 1 && replacePC === 'yes') {
+            courseMult = avgCourses;
         }
         const effLg = lg * courseMult;
         const effSm = sm * courseMult;
