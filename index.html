@@ -1111,6 +1111,20 @@
                     <label>Smallest Table Size</label>
                     <input type="number" id="np-smallest" placeholder="2" value="2">
                 </div>
+                <div class="form-group">
+                    <label>Service Style</label>
+                    <select id="np-service-style" onchange="toggleCourses()">
+                        <option value="single">Single Course (casual / Japanese / café)</option>
+                        <option value="multi">Multi-Course Replace (fine dining / steakhouse)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="np-courses-group" style="display:none">
+                    <label>Avg Courses per Guest</label>
+                    <input type="number" id="np-courses" placeholder="3" value="3" min="1" max="7">
+                </div>
+            </div>
+            <div id="np-service-info" style="margin-top:8px;padding:10px 14px;background:var(--surface-2);border-radius:6px;font-size:0.82rem;color:var(--text-muted)">
+                <strong>Single Course:</strong> Each item used once per guest. Per-table qty = pieces per setting. Good for casual dining, Japanese, cafés.
             </div>
         </div>
 
@@ -1803,7 +1817,8 @@ function runParAdvisor() {
         // ── Depletion PAR: consumption over real cycle + floor stock ──
         const cycleConsumption = Math.ceil(daily * realCycleDays);
         const rawDepletion = cycleConsumption + floorStock;
-        const depletionPar = roundToCase(rawDepletion, caseSize);
+        const depletionPar = rawDepletion;
+        const depletionOrder = roundToCase(rawDepletion, caseSize);
 
         // ── Risk-adjusted PAR (VENUE risks only) ──
         let weightedRiskDays = 0;
@@ -1815,7 +1830,8 @@ function runParAdvisor() {
         });
         const riskBuffer = Math.ceil(weightedRiskDays);
         const rawRisk = cycleConsumption + floorStock + riskBuffer;
-        const riskPar = roundToCase(rawRisk, caseSize);
+        const riskPar = rawRisk;
+        const riskOrder = roundToCase(rawRisk, caseSize);
 
         // ── Warehouse risk buffer (display only — goes into warehouse s/S) ──
         let whWeightedDays = 0;
@@ -1830,11 +1846,12 @@ function runParAdvisor() {
         // ── Worst case PAR (venue risks at 100%) ──
         const worstRiskUnits = venueRisks.reduce((sum, r) => sum + Math.ceil(daily * r.days), 0);
         const rawWorst = cycleConsumption + floorStock + worstRiskUnits;
-        const worstPar = roundToCase(rawWorst, caseSize);
+        const worstPar = rawWorst;
+        const worstOrder = roundToCase(rawWorst, caseSize);
 
         // ── What-if: monthly ordering ──
         const monthlyConsumption = Math.ceil(daily * 30);
-        const monthlyPar = roundToCase(monthlyConsumption + floorStock + riskBuffer, caseSize);
+        const monthlyPar = monthlyConsumption + floorStock + riskBuffer;
 
         // ── Days of coverage ──
         const currentDays = v.currentPar > 0 ? Math.floor(v.currentPar / daily) : 0;
@@ -1999,22 +2016,22 @@ function runParAdvisor() {
             <div class="scenario-card depletion">
                 <div class="scenario-label">Depletion PAR</div>
                 <div class="scenario-value">${depletionPar}</div>
-                <div class="scenario-sub">${depletionDays} days · raw: ${rawDepletion}</div>
+                <div class="scenario-sub">${depletionDays} days · order: ${depletionOrder} (${depletionOrder/caseSize} cases)</div>
             </div>
             <div class="scenario-card risk">
                 <div class="scenario-label">Risk-Adjusted PAR</div>
                 <div class="scenario-value">${riskPar}</div>
-                <div class="scenario-sub">${riskDays} days · raw: ${rawRisk} (+${riskBuffer} buffer)</div>
+                <div class="scenario-sub">${riskDays} days · +${riskBuffer} buffer · order: ${riskOrder} (${riskOrder/caseSize} cases)</div>
             </div>
             <div class="scenario-card worst">
                 <div class="scenario-label">Worst Case PAR</div>
                 <div class="scenario-value">${worstPar}</div>
-                <div class="scenario-sub">raw: ${rawWorst} (+${worstRiskUnits} buffer)</div>
+                <div class="scenario-sub">+${worstRiskUnits} buffer · order: ${worstOrder} (${worstOrder/caseSize} cases)</div>
             </div>
         </div>`;
-        if (depletionPar === riskPar && riskPar === worstPar) {
+        if (depletionOrder === riskOrder && riskOrder === worstOrder) {
             html += `<div style="padding:8px 14px;background:var(--warn-bg);border:1px solid rgba(255,152,0,0.2);border-radius:6px;margin-bottom:12px;font-size:0.82rem;color:var(--warn)">
-                ⚠️ All three PARs are identical due to case rounding (case size: ${caseSize}). Raw values differ: ${rawDepletion} → ${rawRisk} → ${rawWorst}. The risk buffer of ${riskBuffer} units exists but is absorbed by rounding to the next full case.
+                ℹ️ When ordering, all three round to the same case quantity (${depletionOrder}) due to case size ${caseSize}. PARs differ: ${depletionPar} → ${riskPar} → ${worstPar}. The risk buffer of ${riskBuffer} units is built into the venue PAR target.
             </div>`;
         }
 
@@ -2535,6 +2552,17 @@ async function importBible() {
     } catch(e) { status.textContent = 'Error: ' + e.message; console.error(e); }
 }
 
+function toggleCourses() {
+    const style = document.getElementById('np-service-style').value;
+    document.getElementById('np-courses-group').style.display = style === 'multi' ? '' : 'none';
+    const info = document.getElementById('np-service-info');
+    if (style === 'multi') {
+        info.innerHTML = '<strong style="color:var(--accent)">Multi-Course Replace:</strong> Flatware and plates are replaced between courses. Per-table qty is multiplied by the number of courses for items marked as "replaced per course." Wash cycle buffer is increased by 30%. Use for fine dining, steakhouses, French cuisine.';
+    } else {
+        info.innerHTML = '<strong>Single Course:</strong> Each item used once per guest. Per-table qty = pieces per setting. Good for casual dining, Japanese, cafés.';
+    }
+}
+
 function runNewPar() {
     const vn=document.getElementById('np-venue').value||'New Venue';
     const seats=parseFloat(document.getElementById('np-seats').value)||123;
@@ -2545,41 +2573,54 @@ function runNewPar() {
     const apt=covers/tables;
     const cuisine=document.getElementById('np-cuisine').value;
     const cn=cuisine?CUISINE_PRESETS[cuisine].name:'Custom';
+    const serviceStyle=document.getElementById('np-service-style').value;
+    const avgCourses=serviceStyle==='multi'?(parseFloat(document.getElementById('np-courses').value)||3):1;
     const BUF={delicate:2.0,sturdy:1.5,durable:1.5};
     const WASH={delicate:0.40,sturdy:0.23,durable:0.14};
+    const washMult = serviceStyle === 'multi' ? 1.3 : 1.0;
     const rows=document.querySelectorAll('.np-item-row');
     const items=[];
     rows.forEach(r=>{
         const n=r.querySelector('[data-field="name"]').value.trim();
         const cat=r.querySelector('[data-field="category"]').value;
-        const lg=parseFloat(r.querySelector('[data-field="lgQty"]').value)||0;
-        const sm=parseFloat(r.querySelector('[data-field="smQty"]').value)||0;
+        let lg=parseFloat(r.querySelector('[data-field="lgQty"]').value)||0;
+        let sm=parseFloat(r.querySelector('[data-field="smQty"]').value)||0;
         const tp=r.querySelector('[data-field="type"]').value;
         const at=parseFloat(r.querySelector('[data-field="attrition"]').value)||0.07;
         const ov=r.querySelector('[data-field="override"]').value.trim();
         const override = ov!=='' ? parseInt(ov) : null;
         if(!n) return;
+        // Multi-course: flatware and dinnerware get multiplied by courses
+        let courseMult = 1;
+        if (serviceStyle === 'multi' && avgCourses > 1) {
+            const isReplaced = (cat === 'Flatware' || cat === 'Dinnerware');
+            courseMult = isReplaced ? avgCourses : 1;
+        }
+        const effLg = lg * courseMult;
+        const effSm = sm * courseMult;
         let ratio=0, avgQty=0;
-        if(lg>0||sm>0){const sl=(lg-sm)/(lgT-smT); avgQty=sm+sl*(apt-smT); ratio=avgQty/apt;}
-        items.push({name:n,category:cat,lgQty:lg,smQty:sm,avgQty,ratio,type:tp,attrition:at,override});
+        if(effLg>0||effSm>0){const sl=(effLg-effSm)/(lgT-smT); avgQty=effSm+sl*(apt-smT); ratio=avgQty/apt;}
+        items.push({name:n,category:cat,lgQty:lg,smQty:sm,effLg,effSm,avgQty,ratio,type:tp,attrition:at,override,courseMult});
     });
     if(items.length===0){alert('Add at least one item.');return;}
 
+    const styleLabel = serviceStyle === 'multi' ? `Multi-Course (${avgCourses} courses)` : 'Single Course';
+
     // Build results
-    let h=`<div class="card" style="margin-top:24px"><div class="card-title">${vn} <span class="badge">${cn}</span></div>
+    let h=`<div class="card" style="margin-top:24px"><div class="card-title">${vn} <span class="badge">${cn}</span> <span class="badge" style="background:${serviceStyle==='multi'?'rgba(212,168,67,0.15);color:var(--accent)':'rgba(76,175,80,0.15);color:var(--success)'}">${styleLabel}</span></div>
     <div style="display:flex;gap:20px;font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap"><span><strong style="color:var(--text)">${seats}</strong> seats</span><span><strong style="color:var(--text)">${tables}</strong> tables</span><span><strong style="color:var(--text)">${covers}</strong> covers/night</span><span>Avg/tbl: <strong style="color:var(--text)">${apt.toFixed(1)}</strong></span></div>
     <div style="margin-bottom:12px"><button class="btn btn-secondary" onclick="exportToExcel()" style="font-size:0.82rem">📥 Export to Excel</button></div>
-    <table class="result-table"><tr><th>Item</th><th style="text-align:center">3-PAR</th><th style="text-align:center">P+B</th><th style="text-align:center">Suggested</th><th style="text-align:center">Override</th><th style="text-align:center;color:var(--accent)">Final PAR</th><th>Repl/mo</th></tr>`;
+    <table class="result-table"><tr><th>Item</th>${serviceStyle==='multi'?'<th style="text-align:center">×C</th>':''}<th style="text-align:center">3-PAR</th><th style="text-align:center">P+B</th><th style="text-align:center">Suggested</th><th style="text-align:center">Override</th><th style="text-align:center;color:var(--accent)">Final PAR</th><th>Repl/mo</th></tr>`;
 
     let ct='',tS=0,tF=0,tR=0;
     const exportData = [];
 
     items.forEach(i=>{
-        if(i.category!==ct){ct=i.category;h+=`<tr><td colspan="7" style="padding:10px 14px;font-size:0.75rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${ct}</strong></td></tr>`;}
+        if(i.category!==ct){ct=i.category;h+=`<tr><td colspan="${serviceStyle==='multi'?8:7}" style="padding:10px 14px;font-size:0.75rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border-light)"><strong>${ct}</strong></td></tr>`;}
         let tp=0,pb=0,sg=0;
         if(i.ratio>0){
             const bpt=i.type==='delicate'?2:4;
-            const p1=Math.ceil(covers*i.ratio*0.71);const p2=Math.ceil(tables*bpt*i.ratio);const p3=Math.ceil(p1*WASH[i.type]);
+            const p1=Math.ceil(covers*i.ratio*0.71);const p2=Math.ceil(tables*bpt*i.ratio);const p3=Math.ceil(p1*WASH[i.type]*washMult);
             tp=p1+p2+p3;const pk=Math.ceil(covers*i.ratio*0.85);pb=Math.ceil(pk*BUF[i.type]);sg=Math.ceil((tp+pb)/2/5)*5;
         }
         const finalPar = i.override !== null ? i.override : sg;
@@ -2591,13 +2632,15 @@ function runNewPar() {
         const overrideCell = isOverride ? `<strong style="color:var(--warn)">${i.override}</strong>` : '<span class="muted">—</span>';
         const finalStyle = isOverride ? 'background:rgba(255,152,0,0.1);color:var(--warn)' : 'color:var(--accent)';
         const finalTag = isOverride ? ' <span style="font-size:0.6rem;background:var(--warn-bg);color:var(--warn);padding:1px 5px;border-radius:3px">MANUAL</span>' : '';
-        h+=`<tr><td><strong>${i.name}</strong><br><span class="muted" style="font-size:0.7rem">${i.type} · ${(i.attrition*100)}%</span></td>
-        <td style="text-align:center">${tp||'—'}</td><td style="text-align:center">${pb||'—'}</td>
+        const courseCol = serviceStyle==='multi' ? `<td style="text-align:center;font-size:0.78rem;color:${i.courseMult>1?'var(--accent)':'var(--text-muted)'}">${i.courseMult>1?'×'+i.courseMult:'—'}</td>` : '';
+        h+=`<tr><td><strong>${i.name}</strong><br><span class="muted" style="font-size:0.7rem">${i.type} · ${(i.attrition*100)}%${i.courseMult>1?' · ×'+i.courseMult+' courses':''}</span></td>
+        ${courseCol}<td style="text-align:center">${tp||'—'}</td><td style="text-align:center">${pb||'—'}</td>
         <td style="text-align:center">${sg||'—'}</td><td style="text-align:center">${overrideCell}</td>
         <td style="text-align:center;${finalStyle}"><strong>${finalPar}</strong>${finalTag}</td><td class="muted">${rp}</td></tr>`;
     });
 
-    h+=`<tr style="border-top:2px solid var(--border-light)"><td colspan="3"><strong>TOTALS</strong></td><td style="text-align:center"><strong>${tS}</strong></td><td></td><td style="text-align:center" class="highlight"><strong>${tF}</strong></td><td class="muted"><strong>${tR}</strong></td></tr></table></div>`;
+    const totalColspan = serviceStyle==='multi' ? 4 : 3;
+    h+=`<tr style="border-top:2px solid var(--border-light)"><td colspan="${totalColspan}"><strong>TOTALS</strong></td><td style="text-align:center"><strong>${tS}</strong></td><td></td><td style="text-align:center" class="highlight"><strong>${tF}</strong></td><td class="muted"><strong>${tR}</strong></td></tr></table></div>`;
 
     lastNewParResults = {venueName:vn, cuisine:cn, seats, tables, covers, items: exportData};
     document.getElementById('newpar-results').innerHTML=h;
