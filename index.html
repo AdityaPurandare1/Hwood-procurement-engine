@@ -715,49 +715,7 @@
 
         .depletion-marker .dm-value { font-weight: 600; color: var(--text); }
 
-        /* PAR venue row — wider for new fields */
-        .par-venue-row {
-            display: grid;
-            grid-template-columns: 1fr 100px 100px 130px 90px 100px 100px 40px;
-            gap: 10px;
-            align-items: end;
-            padding: 14px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .par-venue-row:last-of-type { border-bottom: none; }
-
-        .par-venue-row input, .par-venue-row select {
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 10px;
-            color: var(--text);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.88rem;
-            width: 100%;
-        }
-
-        .par-venue-row input:focus, .par-venue-row select:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .par-venue-header {
-            display: grid;
-            grid-template-columns: 1fr 100px 100px 130px 90px 100px 100px 40px;
-            gap: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        .par-venue-header span {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-weight: 500;
-        }
+        /* PAR Item rows */
 
         /* Scenario comparison */
         .scenario-grid {
@@ -1011,55 +969,72 @@
     <!-- PAR ADVISOR TAB -->
     <div id="tab-par" class="hidden">
         <div class="card">
-            <div class="card-title">PAR Advisor <span class="badge">Depletion-Based Diagnostic</span></div>
+            <div class="card-title">PAR Advisor <span class="badge">Multi-Item Diagnostic</span></div>
             <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:20px">
-                Enter what you know about the venue's actual behavior — the system will calculate suggested PARs and diagnose the root cause of inventory problems.
+                Enter items with their venue behavior. Each row is one item at one venue. The system calculates suggested PARs, runs simulation verification, and diagnoses root causes.
             </p>
 
-            <div id="par-venue-list"></div>
+            <div id="par-item-list"></div>
 
             <div class="btn-row">
-                <button class="btn btn-secondary" onclick="addParVenue()">+ Add Venue</button>
+                <button class="btn btn-secondary" onclick="addParItem()">+ Add Item</button>
             </div>
         </div>
 
         <!-- Risk Factors -->
         <div class="card">
-            <div class="card-title">Risk Factors <span class="badge">Weighted into PAR</span></div>
-            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px">
-                Adjust likelihood based on your experience. These get weighted into the risk-adjusted PAR.
+            <div class="card-title">Risk Factors</div>
+
+            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:8px">Venue Risks — Factored into venue PAR</div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                These happen at the venue and the warehouse can't prevent them.
+            </p>
+            <div class="risk-grid">
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Breakage / Loss Spike</div>
+                        <div class="risk-desc">Bad weekend, new staff, big event — abnormal loss at the venue</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group"><label>Extra Days</label><input type="number" id="risk-breakage-days" value="7" min="0"></div>
+                        <div class="form-group"><label>Likelihood %</label><input type="number" id="risk-breakage-pct" value="30" min="0" max="100"></div>
+                    </div>
+                </div>
+                <div class="risk-row">
+                    <div class="risk-info">
+                        <div class="risk-name">Venue Ordering Delay</div>
+                        <div class="risk-desc">Manager forgets to submit order, internal approval slow, miscounts</div>
+                    </div>
+                    <div class="risk-inputs">
+                        <div class="form-group"><label>Extra Days</label><input type="number" id="risk-venue-order-days" value="3" min="0"></div>
+                        <div class="form-group"><label>Likelihood %</label><input type="number" id="risk-venue-order-pct" value="50" min="0" max="100"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;margin-top:24px">Warehouse Risks — Handled by warehouse s/S system</div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                These are absorbed by the warehouse. Shown here for reference — not added to venue PAR.
             </p>
             <div class="risk-grid">
                 <div class="risk-row">
                     <div class="risk-info">
                         <div class="risk-name">Supplier Delay</div>
-                        <div class="risk-desc">Shipment arrives later than quoted lead time</div>
+                        <div class="risk-desc">Shipment to warehouse arrives later than quoted lead time</div>
                     </div>
                     <div class="risk-inputs">
-                        <div class="form-group">
-                            <label>Extra Days</label>
-                            <input type="number" id="risk-supplier-days" value="7" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Likelihood %</label>
-                            <input type="number" id="risk-supplier-pct" value="60" min="0" max="100">
-                        </div>
+                        <div class="form-group"><label>Extra Days</label><input type="number" id="risk-supplier-days" value="7" min="0"></div>
+                        <div class="form-group"><label>Likelihood %</label><input type="number" id="risk-supplier-pct" value="60" min="0" max="100"></div>
                     </div>
                 </div>
                 <div class="risk-row">
                     <div class="risk-info">
                         <div class="risk-name">Payment / PO Hold</div>
-                        <div class="risk-desc">Supplier holds shipment due to late payment or PO approval delays</div>
+                        <div class="risk-desc">Supplier holds shipment due to late payment or approval delays</div>
                     </div>
                     <div class="risk-inputs">
-                        <div class="form-group">
-                            <label>Extra Days</label>
-                            <input type="number" id="risk-payment-days" value="10" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Likelihood %</label>
-                            <input type="number" id="risk-payment-pct" value="30" min="0" max="100">
-                        </div>
+                        <div class="form-group"><label>Extra Days</label><input type="number" id="risk-payment-days" value="3" min="0"></div>
+                        <div class="form-group"><label>Likelihood %</label><input type="number" id="risk-payment-pct" value="20" min="0" max="100"></div>
                     </div>
                 </div>
                 <div class="risk-row">
@@ -1068,69 +1043,21 @@
                         <div class="risk-desc">Warehouse is low/empty when venue orders, adding delay</div>
                     </div>
                     <div class="risk-inputs">
-                        <div class="form-group">
-                            <label>Extra Days</label>
-                            <input type="number" id="risk-warehouse-days" value="7" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Likelihood %</label>
-                            <input type="number" id="risk-warehouse-pct" value="40" min="0" max="100">
-                        </div>
-                    </div>
-                </div>
-                <div class="risk-row">
-                    <div class="risk-info">
-                        <div class="risk-name">Breakage / Loss Spike</div>
-                        <div class="risk-desc">Bad weekend, new staff, big event — abnormal loss</div>
-                    </div>
-                    <div class="risk-inputs">
-                        <div class="form-group">
-                            <label>Extra Days</label>
-                            <input type="number" id="risk-breakage-days" value="7" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Likelihood %</label>
-                            <input type="number" id="risk-breakage-pct" value="30" min="0" max="100">
-                        </div>
+                        <div class="form-group"><label>Extra Days</label><input type="number" id="risk-warehouse-days" value="3" min="0"></div>
+                        <div class="form-group"><label>Likelihood %</label><input type="number" id="risk-warehouse-pct" value="10" min="0" max="100"></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Item Config -->
-        <div class="card">
-            <div class="card-title">Item Configuration</div>
-            <div class="form-grid" style="max-width:600px">
-                <div class="form-group">
-                    <label>Item Category</label>
-                    <select id="par-category">
-                        <option value="Glassware - Delicate">Glassware — Delicate (10%)</option>
-                        <option value="Glassware - Sturdy">Glassware — Sturdy (7%)</option>
-                        <option value="Flatware">Flatware (4%)</option>
-                        <option value="Dinnerware">Dinnerware (3%)</option>
-                        <option value="Bar Tools">Bar Tools (2.5%)</option>
-                        <option value="Smallwares">Smallwares (2%)</option>
-                        <option value="Consumable">Consumable (usage-based)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Case / Pack Size</label>
-                    <input type="number" id="par-case-size" value="12" min="1">
-                </div>
-                <div class="form-group">
-                    <label>Supplier Lead Time (days)</label>
-                    <input type="number" id="par-lead-time" value="21" min="1">
-                </div>
-            </div>
-        </div>
-
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="runParAdvisor()" style="padding:14px 40px;font-size:1rem">
                 ▶ Run PAR Diagnostic
             </button>
-            <button class="btn btn-secondary" onclick="downloadParTemplate()" style="font-size:0.82rem">📄 Download CSV Template</button>
+            <button class="btn btn-secondary" onclick="downloadParTemplate()" style="font-size:0.82rem">📄 Download Template</button>
             <input type="file" id="par-csv-input" accept=".csv,.xlsx" style="font-family:'DM Sans';font-size:0.82rem;color:var(--text-muted)">
-            <button class="btn btn-secondary" onclick="importParCSV()" style="font-size:0.82rem">Import Venues</button>
+            <button class="btn btn-secondary" onclick="importParCSV()" style="font-size:0.82rem">Import Items</button>
         </div>
 
         <div id="par-results"></div>
@@ -1749,81 +1676,32 @@ function numOrNull(id) {
 addVenue();
 
 // ─── PAR Advisor ───
-let parVenueCount = 0;
 
-function addParVenue(name='', currentPar='', demand='', orderFreq='every_2_months', lateDays='14', lowPoint='', status='running_ok') {
-    parVenueCount++;
-    const id = parVenueCount;
+let parItemCount = 0;
 
-    if (document.querySelectorAll('.par-venue-row').length === 0) {
-        const header = document.createElement('div');
-        header.className = 'par-venue-header';
-        header.id = 'par-venue-header';
-        header.innerHTML = `
-            <span>Venue Name</span>
-            <span>Current PAR</span>
-            <span>Monthly Usage</span>
-            <span>Order Freq</span>
-            <span>Late By (d)</span>
-            <span>Low Point</span>
-            <span>Status</span>
-            <span></span>
-        `;
-        document.getElementById('par-venue-list').appendChild(header);
+function addParItem(itemName='', venue='', category='Flatware', caseSize='12', leadTime='21', currentPar='', demand='', orderFreq='every_2_months', lateDays='14', lowPoint='', status='running_ok') {
+    parItemCount++;
+    const id = parItemCount;
+    const container = document.getElementById('par-item-list');
+    if (document.querySelectorAll('.par-item-row').length === 0) {
+        container.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr 95px 60px 60px 70px 70px 90px 60px 60px 75px 30px;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--border-light)"><span style="font-size:0.6rem;color:var(--accent);text-transform:uppercase">Item</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Venue</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Category</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Case</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">LT(d)</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">PAR</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Mo Use</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Freq</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Late</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Low</span><span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase">Status</span><span></span></div>';
     }
-
     const row = document.createElement('div');
-    row.className = 'par-venue-row';
-    row.id = `par-venue-${id}`;
-    row.innerHTML = `
-        <input type="text" placeholder="e.g. Delilah LA" value="${name}" data-field="name">
-        <input type="number" placeholder="300" value="${currentPar}" data-field="currentPar" min="0">
-        <input type="number" placeholder="84" value="${demand}" data-field="demand" min="0" step="0.1">
-        <select data-field="orderFreq">
-            <option value="every_month" ${orderFreq==='every_month'?'selected':''}>Monthly</option>
-            <option value="every_2_months" ${orderFreq==='every_2_months'?'selected':''}>Every 2mo</option>
-            <option value="every_3_months" ${orderFreq==='every_3_months'?'selected':''}>Every 3mo</option>
-            <option value="every_4_months" ${orderFreq==='every_4_months'?'selected':''}>Every 4mo</option>
-            <option value="every_6_months" ${orderFreq==='every_6_months'?'selected':''}>Every 6mo</option>
-            <option value="every_9_months" ${orderFreq==='every_9_months'?'selected':''}>Every 9mo</option>
-            <option value="every_12_months" ${orderFreq==='every_12_months'?'selected':''}>Yearly</option>
-        </select>
-        <input type="number" placeholder="30" value="${lateDays}" data-field="lateDays" min="0">
-        <input type="number" placeholder="50" value="${lowPoint}" data-field="lowPoint" min="0">
-        <select data-field="status">
-            <option value="running_low" ${status==='running_low'?'selected':''}>Running low</option>
-            <option value="running_ok" ${status==='running_ok'?'selected':''}>Running OK</option>
-            <option value="too_much" ${status==='too_much'?'selected':''}>Too much stock</option>
-        </select>
-        <button class="btn btn-danger" onclick="removeParVenue(${id})">×</button>
-    `;
-    document.getElementById('par-venue-list').appendChild(row);
-}
-
-function removeParVenue(id) {
-    const el = document.getElementById(`par-venue-${id}`);
-    if (el) el.remove();
-    if (document.querySelectorAll('.par-venue-row').length === 0) {
-        const hdr = document.getElementById('par-venue-header');
-        if (hdr) hdr.remove();
-    }
+    row.className = 'par-item-row';
+    row.id = `par-item-${id}`;
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 95px 60px 60px 70px 70px 90px 60px 60px 75px 30px;gap:4px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)';
+    const s = "background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:5px;color:var(--text);font-family:'DM Sans';font-size:0.76rem;width:100%";
+    row.innerHTML = `<input type="text" placeholder="Item" value="${itemName}" data-field="itemName" style="${s};color:var(--accent);font-weight:600"><input type="text" placeholder="Venue" value="${venue}" data-field="venue" style="${s}"><select data-field="category" style="${s};font-size:0.7rem"><option value="Glassware - Delicate" ${category==='Glassware - Delicate'?'selected':''}>Glass-Del</option><option value="Glassware - Sturdy" ${category==='Glassware - Sturdy'?'selected':''}>Glass-Sty</option><option value="Flatware" ${category==='Flatware'?'selected':''}>Flatware</option><option value="Dinnerware" ${category==='Dinnerware'?'selected':''}>Dinnerware</option><option value="Bar Tools" ${category==='Bar Tools'?'selected':''}>Bar Tools</option><option value="Smallwares" ${category==='Smallwares'?'selected':''}>Smallwares</option></select><input type="number" value="${caseSize}" data-field="caseSize" min="1" style="${s};text-align:center"><input type="number" value="${leadTime}" data-field="leadTime" min="1" style="${s};text-align:center"><input type="number" placeholder="300" value="${currentPar}" data-field="currentPar" min="0" style="${s};text-align:center"><input type="number" placeholder="84" value="${demand}" data-field="demand" min="0" step="0.1" style="${s};text-align:center"><select data-field="orderFreq" style="${s};font-size:0.7rem"><option value="every_month" ${orderFreq==='every_month'?'selected':''}>Mo</option><option value="every_2_months" ${orderFreq==='every_2_months'?'selected':''}>2mo</option><option value="every_3_months" ${orderFreq==='every_3_months'?'selected':''}>3mo</option><option value="every_4_months" ${orderFreq==='every_4_months'?'selected':''}>4mo</option><option value="every_6_months" ${orderFreq==='every_6_months'?'selected':''}>6mo</option><option value="every_9_months" ${orderFreq==='every_9_months'?'selected':''}>9mo</option><option value="every_12_months" ${orderFreq==='every_12_months'?'selected':''}>Yr</option></select><input type="number" placeholder="14" value="${lateDays}" data-field="lateDays" min="0" style="${s};text-align:center"><input type="number" placeholder="50" value="${lowPoint}" data-field="lowPoint" min="0" style="${s};text-align:center"><select data-field="status" style="${s};font-size:0.7rem"><option value="running_low" ${status==='running_low'?'selected':''}>Low</option><option value="running_ok" ${status==='running_ok'?'selected':''}>OK</option><option value="too_much" ${status==='too_much'?'selected':''}>Excess</option></select><button class="btn btn-danger" onclick="document.getElementById('par-item-${id}').remove()" style="font-size:0.85rem;padding:3px">×</button>`;
+    container.appendChild(row);
 }
 
 function runParAdvisor() {
     lastParResults = [];
-    const category = document.getElementById('par-category').value;
-    const caseSize = parseInt(document.getElementById('par-case-size').value) || 12;
-    const supplierLT = parseInt(document.getElementById('par-lead-time').value) || 21;
-    const attritionRate = ATTRITION[category] || 0;
 
-    // Read risk factors
-    // Read risk factors — VENUE risks go into venue PAR
     const venueRisks = [
         { name: 'Breakage Spike', days: num('risk-breakage-days'), pct: num('risk-breakage-pct') / 100 },
         { name: 'Venue Ordering Delay', days: num('risk-venue-order-days'), pct: num('risk-venue-order-pct') / 100 },
     ];
-
-    // Warehouse risks — for display only, NOT added to venue PAR
     const warehouseRisks = [
         { name: 'Supplier Delay', days: num('risk-supplier-days'), pct: num('risk-supplier-pct') / 100 },
         { name: 'Payment / PO Hold', days: num('risk-payment-days'), pct: num('risk-payment-pct') / 100 },
@@ -1841,24 +1719,36 @@ function runParAdvisor() {
         'every_12_months': 'Yearly',
     };
 
-    const rows = document.querySelectorAll('.par-venue-row');
+    // Read all items from multi-item rows
+    const rows = document.querySelectorAll('.par-item-row');
     const venues = [];
     rows.forEach(row => {
-        const name = row.querySelector('[data-field="name"]').value.trim();
+        const itemName = row.querySelector('[data-field="itemName"]').value.trim();
+        const venueName = row.querySelector('[data-field="venue"]').value.trim();
+        const category = row.querySelector('[data-field="category"]').value;
+        const caseSize = parseInt(row.querySelector('[data-field="caseSize"]').value) || 12;
+        const leadTime = parseInt(row.querySelector('[data-field="leadTime"]').value) || 21;
         const currentPar = parseFloat(row.querySelector('[data-field="currentPar"]').value) || 0;
         const demand = parseFloat(row.querySelector('[data-field="demand"]').value) || 0;
         const orderFreq = row.querySelector('[data-field="orderFreq"]').value;
         const lateDays = parseFloat(row.querySelector('[data-field="lateDays"]').value) || 0;
         const lowPoint = parseFloat(row.querySelector('[data-field="lowPoint"]').value) || 0;
         const status = row.querySelector('[data-field="status"]').value;
-        if (name) venues.push({ name, currentPar, demand, orderFreq, lateDays, lowPoint, status });
+        const name = venueName ? `${itemName} — ${venueName}` : itemName;
+        if (name) venues.push({ name, itemName, venueName, currentPar, demand, orderFreq, lateDays, lowPoint, status, category, caseSize, leadTime });
     });
 
-    if (venues.length === 0) { alert('Add at least one venue.'); return; }
+    if (venues.length === 0) { alert('Add at least one item.'); return; }
 
     let html = '';
 
+
     venues.forEach(v => {
+        const category = v.category;
+        const caseSize = v.caseSize;
+        const supplierLT = v.leadTime;
+        const attritionRate = ATTRITION[category] || 0;
+
         const months = freqMonths[v.orderFreq];
         const realCycleDays = months * 30 + v.lateDays; // actual days between orders
 
@@ -2299,9 +2189,11 @@ function runParAdvisor() {
         // Collect for export
         const keyFinding = diagnostics.length > 0 ? diagnostics[0].title : 'No issues';
         lastParResults.push({
-            name: v.name, currentPar: v.currentPar, realMonthly, demandSource,
+            name: v.name, itemName: v.itemName || v.name, venueName: v.venueName || v.name,
+            currentPar: v.currentPar, realMonthly, demandSource,
             depletionPar, riskPar, worstPar, monthlyPar, recommendedPar,
             simVerified: !simFailed, verifiedPar,
+            category, caseSize, leadTime: supplierLT,
             status: v.status, keyFinding,
             riskBuffer, cycleConsumption, floorStock,
             orderFreq: freqLabels[v.orderFreq], lateDays: v.lateDays,
@@ -2338,16 +2230,17 @@ function runParAdvisor() {
         </div>`;
     }
 
-    // Download buttons
-    html += `<div style="margin-top:20px;display:flex;gap:12px">
+    // Download and Push buttons
+    html += `<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn btn-secondary" onclick="downloadParResults()" style="font-size:0.85rem">📥 Download PAR Report (Excel)</button>
+        <button class="btn btn-primary" onclick="pushParToSetup()" style="font-size:0.85rem">🔄 Push Recommended PARs to Setup → Run Stress Test</button>
     </div>`;
 
     document.getElementById('par-results').innerHTML = html;
 }
 
 // Init PAR advisor with one empty row
-addParVenue();
+addParItem();
 
 // ─── New PAR Setup Engine (Cuisine + CSV + Override + Export) ───
 
@@ -2730,12 +2623,31 @@ function exportToExcel() {
 // ─── CSV Templates & Import ───
 
 function downloadParTemplate() {
-    const headers = ['Venue Name','Current PAR','Monthly Usage','Order Frequency (months)','Late Days','Low Point','Status (running_low/running_ok/too_much)'];
-    const example = ['Delilah LA','300','84','2','14','50','running_low'];
+    const headers = ['Item Name','Venue','Category','Case Size','Lead Time (days)','Current PAR','Monthly Usage','Order Frequency (months)','Late Days','Low Point','Status'];
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, example, ['Delilah MIA','500','120','3','7','100','running_ok']]);
-    ws['!cols'] = headers.map(h => ({wch: Math.max(h.length + 2, 15)}));
-    XLSX.utils.book_append_sheet(wb, ws, 'PAR Venues');
+    const rows = [
+        headers,
+        ['Dinner Fork','Delilah LA','Flatware','100','21','200','100','1','14','50','running_low'],
+        ['Dinner Fork','Delilah MIA','Flatware','100','21','300','120','2','7','80','running_ok'],
+        ['Water Glass','Delilah LA','Glassware - Sturdy','24','14','450','40','1','14','100','running_ok'],
+        ['Water Glass','Delilah MIA','Glassware - Sturdy','24','14','600','55','2','7','150','running_low'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:16},{wch:14},{wch:18},{wch:10},{wch:14},{wch:10},{wch:14},{wch:20},{wch:10},{wch:10},{wch:15}];
+    XLSX.utils.book_append_sheet(wb, ws, 'PAR Items');
+
+    const instrRows = [['INSTRUCTIONS'],[],
+        ['Each row = one item at one venue. Same item at different venues = multiple rows.'],
+        ['Item Name groups the results — all rows with the same item name are analyzed together.'],
+        [],
+        ['Category: Glassware - Delicate, Glassware - Sturdy, Flatware, Dinnerware, Bar Tools, Smallwares'],
+        ['Order Frequency: 1=Monthly, 2=Every 2mo, 3=Quarterly, 4=Every 4mo, 6=Every 6mo, 9=Every 9mo, 12=Yearly'],
+        ['Status: running_low, running_ok, too_much'],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(instrRows);
+    ws2['!cols'] = [{wch:90}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Instructions');
+
     XLSX.writeFile(wb, 'PAR_Advisor_Template.xlsx');
 }
 
@@ -2749,29 +2661,30 @@ function importParCSV() {
             const wb = XLSX.read(data, {type:'array'});
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, {header:1});
-            // Clear existing venues
-            document.querySelectorAll('.par-venue-row').forEach(r => r.remove());
-            const hdr = document.getElementById('par-venue-header');
-            if (hdr) hdr.remove();
-            parVenueCount = 0;
-            // Map frequency months to values
+            // Clear existing items
+            document.getElementById('par-item-list').innerHTML = '';
+            parItemCount = 0;
             const freqMap = {'1':'every_month','2':'every_2_months','3':'every_3_months','4':'every_4_months','6':'every_6_months','9':'every_9_months','12':'every_12_months'};
             let imported = 0;
             rows.forEach((row, i) => {
-                if (i === 0) return; // skip header
-                const name = String(row[0]||'').trim();
-                if (!name) return;
-                const par = String(row[1]||'');
-                const usage = String(row[2]||'');
-                const freqMo = String(row[3]||'2');
-                const late = String(row[4]||'14');
-                const low = String(row[5]||'');
-                const status = String(row[6]||'running_ok').trim();
+                if (i === 0) return;
+                const itemName = String(row[0]||'').trim();
+                if (!itemName) return;
+                const venue = String(row[1]||'');
+                const category = String(row[2]||'Flatware');
+                const caseSize = String(row[3]||'12');
+                const leadTime = String(row[4]||'21');
+                const par = String(row[5]||'');
+                const usage = String(row[6]||'');
+                const freqMo = String(row[7]||'2');
+                const late = String(row[8]||'14');
+                const low = String(row[9]||'');
+                const status = String(row[10]||'running_ok').trim();
                 const freq = freqMap[freqMo] || 'every_2_months';
-                addParVenue(name, par, usage, freq, late, low, status);
+                addParItem(itemName, venue, category, caseSize, leadTime, par, usage, freq, late, low, status);
                 imported++;
             });
-            alert(`Imported ${imported} venues.`);
+            alert(`Imported ${imported} items.`);
         } catch(err) { alert('Error reading file: ' + err.message); }
     };
     reader.readAsArrayBuffer(fileInput.files[0]);
@@ -2779,28 +2692,49 @@ function importParCSV() {
 
 // ─── Download PAR Advisor Results ───
 function downloadParResults() {
-    if (!lastParResults) { alert('Run the diagnostic first.'); return; }
+    if (!lastParResults || lastParResults.length === 0) { alert('Run the diagnostic first.'); return; }
     const wb = XLSX.utils.book_new();
-    // Issues Report sheet
-    const issuesData = [['PAR Advisor — Item Issues Report'],[]];
-    const itemData = [['Item Details'],[], ['Venue','Current PAR','Real Monthly','Depletion PAR','Risk-Adjusted PAR','Worst Case','Status','Key Finding']];
+
+    // PAR Summary sheet
+    const itemData = [['PAR Advisor — Multi-Item Report'],[], 
+        ['Item','Venue','Category','Case Size','LT (days)','Current PAR','Real Monthly','Depletion PAR','Risk-Adjusted','Recommended','Verified','Status','Key Finding']];
     lastParResults.forEach(v => {
-        itemData.push([v.name, v.currentPar, v.realMonthly, v.depletionPar, v.riskPar, v.worstPar, v.status, v.keyFinding || '']);
+        itemData.push([v.itemName||v.name, v.venueName||'', v.category||'', v.caseSize||'', v.leadTime||'',
+            v.currentPar, v.realMonthly, v.depletionPar, v.riskPar, v.recommendedPar,
+            v.simVerified ? 'Yes' : 'No', v.status, v.keyFinding || '']);
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(itemData);
+    ws1['!cols'] = [{wch:18},{wch:15},{wch:16},{wch:8},{wch:8},{wch:10},{wch:12},{wch:12},{wch:14},{wch:14},{wch:8},{wch:12},{wch:35}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'PAR Summary');
+
+    // Issues sheet
+    const issuesData = [['Diagnostic Issues'],[], ['Item','Venue','Severity','Issue','Details']];
+    lastParResults.forEach(v => {
         if (v.diagnostics && v.diagnostics.length) {
             v.diagnostics.forEach(d => {
-                issuesData.push([v.name, d.level, d.title, d.text.replace(/<[^>]*>/g,'')]);
+                issuesData.push([v.itemName||v.name, v.venueName||'', d.level, d.title, d.text.replace(/<[^>]*>/g,'')]);
             });
         }
     });
-    const ws1 = XLSX.utils.aoa_to_sheet(itemData);
-    ws1['!cols'] = [{wch:20},{wch:12},{wch:14},{wch:14},{wch:16},{wch:14},{wch:14},{wch:40}];
-    XLSX.utils.book_append_sheet(wb, ws1, 'PAR Summary');
-    if (issuesData.length > 2) {
-        issuesData.splice(2, 0, ['Venue','Severity','Issue','Details']);
+    if (issuesData.length > 3) {
         const ws2 = XLSX.utils.aoa_to_sheet(issuesData);
-        ws2['!cols'] = [{wch:20},{wch:10},{wch:30},{wch:60}];
+        ws2['!cols'] = [{wch:18},{wch:15},{wch:10},{wch:30},{wch:60}];
         XLSX.utils.book_append_sheet(wb, ws2, 'Issues');
     }
+
+    // Action Items sheet — items that need PAR changes
+    const actionData = [['Action Items — PARs to Change'],[], ['Item','Venue','Current PAR','Set To','Change','Status']];
+    lastParResults.forEach(v => {
+        if (v.currentPar > 0 && v.recommendedPar && v.recommendedPar !== v.currentPar) {
+            actionData.push([v.itemName||v.name, v.venueName||'', v.currentPar, v.recommendedPar, v.recommendedPar - v.currentPar, v.status]);
+        }
+    });
+    if (actionData.length > 3) {
+        const ws3 = XLSX.utils.aoa_to_sheet(actionData);
+        ws3['!cols'] = [{wch:18},{wch:15},{wch:12},{wch:10},{wch:10},{wch:12}];
+        XLSX.utils.book_append_sheet(wb, ws3, 'Action Items');
+    }
+
     XLSX.writeFile(wb, 'PAR_Advisor_Report.xlsx');
 }
 
@@ -2821,6 +2755,29 @@ function downloadSetupTemplate() {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...examples]);
     ws['!cols'] = [{wch:22},{wch:14},{wch:12},{wch:10},{wch:14},{wch:18},{wch:16},{wch:6},{wch:14},{wch:8},{wch:14}];
     XLSX.utils.book_append_sheet(wb, ws, 'Items & Venues');
+
+    const instrRows = [['SETUP TEMPLATE INSTRUCTIONS'],[],
+        ['Each row = one item at one venue. Same item at multiple venues = multiple rows.'],
+        ['For single-item mode: fill one item across venues, then use "Import" on the Setup tab.'],
+        ['For multi-item mode: fill multiple items, then use "Import Items" in the Multi-Item section.'],
+        [],
+        ['Column Guide:'],
+        ['Item Name — groups rows together. All rows with same name = same item.'],
+        ['SKU — item identifier (same across all venues for one item)'],
+        ['Category — Bar Tools, Flatware, Dinnerware, Glassware, Smallwares'],
+        ['Case Size — units per case/pack (same across venues)'],
+        ['Lead Time — supplier lead time in days (same across venues)'],
+        ['Supplier — supplier name (optional)'],
+        ['Venue — venue name where this item is used'],
+        ['PAR — current PAR level at this venue'],
+        ['Monthly Demand — observed monthly usage at this venue'],
+        ['On Hand — current stock at this venue'],
+        ['Trigger Months — months of stock remaining before reorder trigger (default 2.5)'],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(instrRows);
+    ws2['!cols'] = [{wch:90}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Instructions');
+
     XLSX.writeFile(wb, 'Setup_Multi_Item_Template.xlsx');
 }
 
@@ -3210,6 +3167,41 @@ function downloadBatchResults() {
     XLSX.utils.book_append_sheet(wb, ws2, 'Venue Details');
 
     XLSX.writeFile(wb, 'Batch_Procurement_Results.xlsx');
+}
+
+// ─── Push PAR Advisor Results to Setup Tab ───
+function pushParToSetup() {
+    if (!lastParResults || lastParResults.length === 0) {
+        alert('Run the PAR Diagnostic first.');
+        return;
+    }
+
+    // Use first item's config for Setup tab item details
+    const first = lastParResults[0];
+    const itemName = document.getElementById('item-name');
+    if (!itemName.value) itemName.value = first.itemName || 'Item from PAR Advisor';
+    document.getElementById('item-case-size').value = first.caseSize || 12;
+    document.getElementById('item-lead-time').value = first.leadTime || 21;
+
+    // Clear existing venues and add from PAR results
+    document.getElementById('venue-list').innerHTML = '';
+    venueCount = 0;
+
+    lastParResults.forEach(v => {
+        const par = v.recommendedPar || v.riskPar || v.currentPar;
+        const demand = v.realMonthly || 0;
+        const displayName = v.venueName || v.name;
+        addVenue(displayName, String(par), String(demand), '0', '2.5');
+    });
+
+    // Switch to Setup tab
+    switchTab('input');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab')[0].classList.add('active');
+
+    // Scroll to top and show notification
+    window.scrollTo(0, 0);
+    alert(`Pushed ${lastParResults.length} venue(s) with recommended PARs to Setup.\n\nVenues loaded with simulation-verified PARs. Click "Run Procurement Engine" to stress test the warehouse s/S levels for these PARs.`);
 }
 </script>
 </body></html>
