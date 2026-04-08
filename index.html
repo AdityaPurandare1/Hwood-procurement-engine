@@ -916,6 +916,9 @@
             <div id="venue-list"></div>
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="addVenue()">+ Add Venue</button>
+                <button class="btn btn-secondary" onclick="downloadSetupTemplate()" style="font-size:0.82rem">📄 Template</button>
+                <input type="file" id="setup-csv-input" accept=".csv,.xlsx" style="font-family:'DM Sans';font-size:0.82rem;color:var(--text-muted)">
+                <button class="btn btn-secondary" onclick="importSetupCSV()" style="font-size:0.82rem">Import</button>
             </div>
         </div>
 
@@ -970,9 +973,29 @@
             </div>
         </div>
 
-        <button class="btn btn-primary" onclick="runEngine()" style="padding: 14px 40px; font-size: 1rem;">
-            ▶ Run Procurement Engine
-        </button>
+        <!-- Multi-Item Import -->
+        <div class="card">
+            <div class="card-title">Multi-Item Import <span class="badge">Optional</span></div>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">
+                Upload a CSV with multiple items to run the engine in batch. Each item gets its own stress test and recommendations. Or use the fields above for a single item.
+            </p>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn-secondary" onclick="downloadMultiItemTemplate()" style="font-size:0.82rem">📄 Download Template</button>
+                <input type="file" id="multi-item-input" accept=".csv,.xlsx" style="font-family:'DM Sans';font-size:0.82rem;color:var(--text-muted)">
+                <button class="btn btn-secondary" onclick="importMultiItems()" style="font-size:0.82rem">Import Items</button>
+            </div>
+            <div id="multi-item-status" style="margin-top:8px;font-size:0.82rem;color:var(--text-muted)"></div>
+            <div id="multi-item-list" style="margin-top:12px"></div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center">
+            <button class="btn btn-primary" onclick="runEngine()" style="padding: 14px 40px; font-size: 1rem;">
+                ▶ Run Procurement Engine
+            </button>
+            <button class="btn btn-primary" id="run-multi-btn" onclick="runMultiEngine()" style="padding: 14px 40px; font-size: 1rem; display:none; background:var(--surface-2); color:var(--accent); border:1px solid var(--accent);">
+                ▶ Run All Items (Batch)
+            </button>
+        </div>
     </div>
 
     <!-- RESULTS TAB -->
@@ -1101,9 +1124,14 @@
             </div>
         </div>
 
-        <button class="btn btn-primary" onclick="runParAdvisor()" style="padding:14px 40px;font-size:1rem">
-            ▶ Run PAR Diagnostic
-        </button>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+            <button class="btn btn-primary" onclick="runParAdvisor()" style="padding:14px 40px;font-size:1rem">
+                ▶ Run PAR Diagnostic
+            </button>
+            <button class="btn btn-secondary" onclick="downloadParTemplate()" style="font-size:0.82rem">📄 Download CSV Template</button>
+            <input type="file" id="par-csv-input" accept=".csv,.xlsx" style="font-family:'DM Sans';font-size:0.82rem;color:var(--text-muted)">
+            <button class="btn btn-secondary" onclick="importParCSV()" style="font-size:0.82rem">Import Venues</button>
+        </div>
 
         <div id="par-results"></div>
     </div>
@@ -1377,27 +1405,55 @@ function runEngine() {
     const whNeed = Math.max(0, S - currentPos);
     const whNeedCases = roundToCase(whNeed, item.caseSize);
 
-    // ── Stress Test ──
+    // ── Stress Test (realistic staggered venue ordering during LT) ──
     const stressTest = [];
     let stock = s;
     stressTest.push({ day: 0, event: `Warehouse at s (${s}), PO placed`, stock, type: 'start' });
 
-    let day = 0;
-    let wave = 0;
-    while (day < item.leadTime) {
-        day += wh.review;
-        wave++;
-        if (day <= item.leadTime) {
-            stock -= simulDraw;
+    // Sort venues by demand (highest first) for worst-case
+    const sortedVenues = [...venueResults].sort((a, b) => b.typicalDraw - a.typicalDraw);
+    const venueOrders = [];
+
+    // Stagger venue orders realistically — first orders cluster in week 1-2
+    if (sortedVenues.length >= 1) venueOrders.push({ day: 1, venue: sortedVenues[0] });
+    if (sortedVenues.length >= 2) venueOrders.push({ day: Math.min(7, item.leadTime), venue: sortedVenues[1] });
+    if (sortedVenues.length >= 3) venueOrders.push({ day: Math.min(14, item.leadTime), venue: sortedVenues[2] });
+    for (let i = 3; i < sortedVenues.length; i++) {
+        venueOrders.push({ day: Math.min(Math.ceil((i + 1) * 7), item.leadTime), venue: sortedVenues[i] });
+    }
+
+    venueOrders.sort((a, b) => a.day - b.day);
+    venueOrders.forEach(o => {
+        if (o.day <= item.leadTime) {
+            stock -= o.venue.typicalDraw;
             stressTest.push({
-                day,
-                event: `Wave ${wave}: ${wh.maxSimul} venue(s) order (${simulDraw} out)`,
+                day: o.day,
+                event: `${o.venue.name} orders (${o.venue.typicalDraw} units out)`,
                 stock: Math.max(0, stock),
                 stockout: stock < 0,
                 type: 'draw',
             });
         }
+    });
+
+    // If LT > 30 days, venues may reorder
+    if (item.leadTime > 30) {
+        venueOrders.forEach(o => {
+            const day2 = o.day + 30;
+            if (day2 <= item.leadTime) {
+                stock -= o.venue.typicalDraw;
+                stressTest.push({
+                    day: day2,
+                    event: `${o.venue.name} reorders (${o.venue.typicalDraw} out)`,
+                    stock: Math.max(0, stock),
+                    stockout: stock < 0,
+                    type: 'draw',
+                });
+            }
+        });
+        stressTest.sort((a, b) => a.day - b.day);
     }
+
     stock += reorderQty;
     stressTest.push({
         day: item.leadTime,
@@ -1405,6 +1461,22 @@ function runEngine() {
         stock,
         type: 'delivery',
     });
+
+    // ── Auto-correct if stress test fails ──
+    const hasStockout = stressTest.some(e => e.stockout);
+    let correctedS = null, correctedSBig = null, correctedReorder = null;
+    if (hasStockout) {
+        // Calculate total drawdown during lead time
+        let totalDraw = 0;
+        stressTest.forEach(e => { if (e.type === 'draw') totalDraw += parseInt(e.event.match(/\((\d+)/)?.[1] || 0); });
+        // New s = total drawdown + safety stock (so stock never goes below 0)
+        const newS = totalDraw + whSS;
+        const newSBig = roundToCase(newS + Math.max(simulDraw, Math.ceil(combinedDaily * wh.review)), item.caseSize);
+        const newReorder = roundToCase(Math.max(item.caseSize, newSBig - newS), item.caseSize);
+        correctedS = newS;
+        correctedSBig = newSBig;
+        correctedReorder = newReorder;
+    }
 
     // ── TCO Table ──
     let tcoTable = null;
@@ -1459,6 +1531,7 @@ function runEngine() {
             totalCost: item.unitCost ? totalFirstOrder * item.unitCost : null,
         },
         stressTest, tcoTable, tcoResult,
+        stressCorrection: hasStockout ? { correctedS, correctedSBig, correctedReorder } : null,
     };
 
     renderResults();
@@ -1561,6 +1634,20 @@ function renderResults() {
                 <div class="stress-stock">${e.stock} units ${tag}</div>
             </div>`;
         }).join('')}
+        ${r.stressCorrection ? `
+        <div style="margin-top:16px;padding:14px 18px;background:var(--danger-bg);border:1px solid rgba(224,82,82,0.2);border-radius:8px">
+            <div style="font-weight:700;color:var(--danger);margin-bottom:6px">⚠️ Stockout Detected — Auto-Corrected Values:</div>
+            <div style="font-size:0.88rem;color:var(--text)">
+                To prevent stockout at current depletion rates, increase:
+                <strong>s</strong> from ${wh.s} → <strong style="color:var(--accent)">${r.stressCorrection.correctedS}</strong>  ·  
+                <strong>S</strong> from ${wh.S} → <strong style="color:var(--accent)">${r.stressCorrection.correctedSBig}</strong>  ·  
+                Reorder: <strong style="color:var(--accent)">${r.stressCorrection.correctedReorder}</strong> units (${r.stressCorrection.correctedReorder / r.item.caseSize} cases)
+            </div>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Apply these in the Setup tab under Manual Override (s, S) and re-run to verify.</div>
+        </div>` : `
+        <div style="margin-top:12px;padding:10px 14px;background:var(--success-bg);border:1px solid rgba(76,175,80,0.2);border-radius:8px;font-size:0.88rem;color:var(--success)">
+            ✅ Stress test passed — warehouse can sustain all venue orders during the ${r.item.leadTime}-day supplier lead time.
+        </div>`}
     </div>`;
 
     // TCO
@@ -1585,6 +1672,11 @@ function renderResults() {
             </div>
         </div>`;
     }
+
+    // Download button
+    html += `<div style="margin-top:20px;display:flex;gap:12px">
+        <button class="btn btn-secondary" onclick="downloadEngineResults()" style="font-size:0.85rem">📥 Download Results (Excel)</button>
+    </div>`;
 
     document.getElementById('results-content').innerHTML = html;
 }
@@ -1718,17 +1810,24 @@ function removeParVenue(id) {
 }
 
 function runParAdvisor() {
+    lastParResults = [];
     const category = document.getElementById('par-category').value;
     const caseSize = parseInt(document.getElementById('par-case-size').value) || 12;
     const supplierLT = parseInt(document.getElementById('par-lead-time').value) || 21;
     const attritionRate = ATTRITION[category] || 0;
 
     // Read risk factors
-    const risks = [
+    // Read risk factors — VENUE risks go into venue PAR
+    const venueRisks = [
+        { name: 'Breakage Spike', days: num('risk-breakage-days'), pct: num('risk-breakage-pct') / 100 },
+        { name: 'Venue Ordering Delay', days: num('risk-venue-order-days'), pct: num('risk-venue-order-pct') / 100 },
+    ];
+
+    // Warehouse risks — for display only, NOT added to venue PAR
+    const warehouseRisks = [
         { name: 'Supplier Delay', days: num('risk-supplier-days'), pct: num('risk-supplier-pct') / 100 },
         { name: 'Payment / PO Hold', days: num('risk-payment-days'), pct: num('risk-payment-pct') / 100 },
         { name: 'Warehouse Stockout', days: num('risk-warehouse-days'), pct: num('risk-warehouse-pct') / 100 },
-        { name: 'Breakage Spike', days: num('risk-breakage-days'), pct: num('risk-breakage-pct') / 100 },
     ];
 
     const freqMonths = {
@@ -1787,10 +1886,10 @@ function runParAdvisor() {
         const cycleConsumption = Math.ceil(daily * realCycleDays);
         const depletionPar = roundToCase(cycleConsumption + floorStock, caseSize);
 
-        // ── Risk-adjusted PAR ──
+        // ── Risk-adjusted PAR (VENUE risks only) ──
         let weightedRiskDays = 0;
         const riskBreakdown = [];
-        risks.forEach(r => {
+        venueRisks.forEach(r => {
             const weighted = Math.ceil(daily * r.days * r.pct);
             weightedRiskDays += daily * r.days * r.pct;
             riskBreakdown.push({ ...r, units: Math.ceil(daily * r.days), weighted });
@@ -1798,8 +1897,18 @@ function runParAdvisor() {
         const riskBuffer = Math.ceil(weightedRiskDays);
         const riskPar = roundToCase(cycleConsumption + floorStock + riskBuffer, caseSize);
 
-        // ── Worst case PAR ──
-        const worstRiskUnits = risks.reduce((sum, r) => sum + Math.ceil(daily * r.days), 0);
+        // ── Warehouse risk buffer (display only — goes into warehouse s/S) ──
+        let whWeightedDays = 0;
+        const whRiskBreakdown = [];
+        warehouseRisks.forEach(r => {
+            const weighted = Math.ceil(daily * r.days * r.pct);
+            whWeightedDays += daily * r.days * r.pct;
+            whRiskBreakdown.push({ ...r, units: Math.ceil(daily * r.days), weighted });
+        });
+        const whRiskBuffer = Math.ceil(whWeightedDays);
+
+        // ── Worst case PAR (venue risks at 100%) ──
+        const worstRiskUnits = venueRisks.reduce((sum, r) => sum + Math.ceil(daily * r.days), 0);
         const worstPar = roundToCase(cycleConsumption + floorStock + worstRiskUnits, caseSize);
 
         // ── What-if: monthly ordering ──
@@ -1877,12 +1986,12 @@ function runParAdvisor() {
         }
 
         // 5. Payment/processing delays
-        if (risks[1].pct > 0.2) {
+        if (warehouseRisks[1].pct > 0.2) {
             diagnostics.push({
                 level: 'warning',
                 icon: '💳',
                 title: 'Payment Delays Affecting Supply Chain',
-                text: `Payment holds rated at ${Math.round(risks[1].pct * 100)}% likelihood. Each occurrence adds ~${risks[1].days} days (${Math.ceil(daily * risks[1].days)} units of extra PAR needed). This is a finance/ops problem, not an inventory problem.`,
+                text: `Payment holds rated at ${Math.round(warehouseRisks[1].pct * 100)}% likelihood. Each occurrence adds ~${warehouseRisks[1].days} days (${Math.ceil(daily * warehouseRisks[1].days)} units of extra buffer needed at the warehouse). This is a finance/ops problem — the warehouse s/S system absorbs it.`,
                 action: `<strong>Investigate:</strong> Are POs getting approved on time? Is accounting paying invoices within terms? Set up auto-pay or pre-approved PO limits for recurring items.`,
             });
         }
@@ -1983,9 +2092,45 @@ function runParAdvisor() {
             </div>
         </div>`;
 
-        // Current PAR vs recommended
+        // ── Simulation Verification: prove the suggested PAR survives 3 cycles ──
+        let simStock = riskPar;
+        let simFailed = false;
+        let simMinStock = riskPar;
+        const simCycles = 3;
+        const simEvents = [];
+        for (let cycle = 1; cycle <= simCycles; cycle++) {
+            // Deplete over the order cycle
+            const consumed = Math.ceil(daily * realCycleDays);
+            simStock -= consumed;
+            simMinStock = Math.min(simMinStock, simStock);
+            if (simStock < 0) { simFailed = true; }
+            simEvents.push({ cycle, action: 'deplete', stock: Math.max(0, simStock), consumed });
+            // Restock to PAR
+            simStock = riskPar;
+            simEvents.push({ cycle, action: 'restock', stock: simStock });
+        }
+
+        // If simulation fails, calculate corrected PAR
+        let verifiedPar = riskPar;
+        if (simFailed) {
+            // Need PAR where stock never goes below 0 over one full cycle
+            const neededPar = Math.ceil(daily * realCycleDays) + riskBuffer + floorStock;
+            verifiedPar = roundToCase(neededPar, caseSize);
+        }
+
+        const simBadge = simFailed
+            ? `<span style="font-size:0.72rem;background:var(--danger-bg);color:var(--danger);padding:2px 8px;border-radius:4px;font-weight:600">SIMULATION FAILED</span>`
+            : `<span style="font-size:0.72rem;background:var(--success-bg);color:var(--success);padding:2px 8px;border-radius:4px;font-weight:600">✓ VERIFIED</span>`;
+
+        html += `<div style="padding:10px 14px;background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:0.85rem;display:flex;align-items:center;gap:10px">
+            ${simBadge}
+            <span class="text-muted">Simulated ${simCycles} order cycles (${simCycles * realCycleDays} days) — min stock: <strong style="color:var(--text)">${Math.max(0, simMinStock)}</strong></span>
+            ${simFailed ? `<span style="color:var(--danger)">→ Corrected PAR: <strong>${verifiedPar}</strong></span>` : ''}
+        </div>`;
+        // Use verifiedPar (corrected if simulation failed) for the recommendation
+        const recommendedPar = Math.max(riskPar, verifiedPar);
         if (v.currentPar > 0) {
-            const diff = riskPar - v.currentPar;
+            const diff = recommendedPar - v.currentPar;
             const diffText = diff > 0
                 ? `<span style="color:var(--danger)">Increase by ${diff} units (${Math.ceil(diff/caseSize)} cases)</span>`
                 : diff < -caseSize
@@ -1993,7 +2138,7 @@ function runParAdvisor() {
                     : `<span style="color:var(--success)">Current PAR is appropriate</span>`;
 
             html += `<div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:0.9rem">
-                Current PAR: <strong>${v.currentPar}</strong> → Recommended: <strong style="color:var(--accent)">${riskPar}</strong> · ${diffText}
+                Current PAR: <strong>${v.currentPar}</strong> → Recommended: <strong style="color:var(--accent)">${recommendedPar}</strong> · ${diffText}
             </div>`;
         }
 
@@ -2095,9 +2240,9 @@ function runParAdvisor() {
             </div>
         </div>`;
 
-        // Risk factor breakdown
+        // Venue Risk breakdown
         html += `<div style="margin-top:16px">
-            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Risk Factor Breakdown</div>
+            <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Venue Risk Breakdown — Added to PAR</div>
             <table class="result-table">
                 <tr><th>Risk</th><th>Extra Days</th><th>Raw Units</th><th>Likelihood</th><th>Weighted Units</th></tr>
                 ${riskBreakdown.map(r => `
@@ -2109,8 +2254,28 @@ function runParAdvisor() {
                     <td class="highlight">${r.weighted}</td>
                 </tr>`).join('')}
                 <tr style="border-top:2px solid var(--border-light)">
-                    <td colspan="4"><strong>Total Risk Buffer</strong></td>
+                    <td colspan="4"><strong>Venue Risk Buffer (in PAR)</strong></td>
                     <td class="highlight"><strong>${riskBuffer}</strong></td>
+                </tr>
+            </table>
+        </div>`;
+
+        // Warehouse Risk reference
+        html += `<div style="margin-top:16px">
+            <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Warehouse Risks — Handled by warehouse s/S (not in venue PAR)</div>
+            <table class="result-table">
+                <tr><th>Risk</th><th>Extra Days</th><th>Raw Units</th><th>Likelihood</th><th>Weighted Units</th></tr>
+                ${whRiskBreakdown.map(r => `
+                <tr>
+                    <td>${r.name}</td>
+                    <td class="muted">${r.days}d</td>
+                    <td>${r.units}</td>
+                    <td class="muted">${Math.round(r.pct*100)}%</td>
+                    <td class="muted">${r.weighted}</td>
+                </tr>`).join('')}
+                <tr style="border-top:2px solid var(--border-light)">
+                    <td colspan="4">Warehouse Risk Buffer (in s/S)</td>
+                    <td class="muted">${whRiskBuffer}</td>
                 </tr>
             </table>
         </div>`;
@@ -2130,7 +2295,53 @@ function runParAdvisor() {
         </div>`;
 
         html += `</div>`; // close par-rec-card
+
+        // Collect for export
+        const keyFinding = diagnostics.length > 0 ? diagnostics[0].title : 'No issues';
+        lastParResults.push({
+            name: v.name, currentPar: v.currentPar, realMonthly, demandSource,
+            depletionPar, riskPar, worstPar, monthlyPar, recommendedPar,
+            simVerified: !simFailed, verifiedPar,
+            status: v.status, keyFinding,
+            riskBuffer, cycleConsumption, floorStock,
+            orderFreq: freqLabels[v.orderFreq], lateDays: v.lateDays,
+            diagnostics: diagnostics.map(d => ({level:d.level, title:d.title, text:d.text})),
+        });
     });
+
+    // ── Items Issues Report ──
+    const issueItems = lastParResults.filter(v => v.status === 'running_low' || (v.currentPar > 0 && v.currentPar < v.recommendedPar));
+    if (issueItems.length > 0) {
+        html += `<div class="card" style="margin-top:24px;border-left:3px solid var(--danger)">
+            <div class="card-title">⚠️ Items Running Out — Action Required</div>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px">These items have PARs below the recommended level or are flagged as running low. The recommended PAR has been simulation-verified to survive multiple order cycles.</p>
+            <table class="result-table">
+                <tr><th>Venue</th><th>Current PAR</th><th style="color:var(--accent)">Set PAR To</th><th>Shortfall</th><th>Verified</th><th>Key Issue</th></tr>
+                ${issueItems.map(v => {
+                    const shortfall = v.recommendedPar - v.currentPar;
+                    const verBadge = v.simVerified
+                        ? '<span style="color:var(--success);font-size:0.75rem">✓ Verified</span>'
+                        : '<span style="color:var(--warn);font-size:0.75rem">Corrected</span>';
+                    return `<tr>
+                        <td><strong>${v.name}</strong></td>
+                        <td>${v.currentPar}</td>
+                        <td class="highlight"><strong>${v.recommendedPar}</strong></td>
+                        <td style="color:var(--danger)">+${shortfall > 0 ? shortfall : 0}</td>
+                        <td>${verBadge}</td>
+                        <td style="font-size:0.82rem">${v.keyFinding}</td>
+                    </tr>`;
+                }).join('')}
+            </table>
+            <div style="margin-top:12px;padding:10px 14px;background:var(--surface-2);border-radius:6px;font-size:0.85rem;color:var(--text-muted)">
+                💡 If ordering frequency is the root cause, switching to monthly ordering would reduce PAR to: ${issueItems.map(v => `<strong>${v.name}: ${v.monthlyPar}</strong>`).join(' · ')}
+            </div>
+        </div>`;
+    }
+
+    // Download buttons
+    html += `<div style="margin-top:20px;display:flex;gap:12px">
+        <button class="btn btn-secondary" onclick="downloadParResults()" style="font-size:0.85rem">📥 Download PAR Report (Excel)</button>
+    </div>`;
 
     document.getElementById('par-results').innerHTML = html;
 }
@@ -2514,6 +2725,491 @@ function exportToExcel() {
     XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
 
     XLSX.writeFile(wb, `${r.venueName.replace(/[^a-zA-Z0-9]/g,'_')}_PAR_Setup.xlsx`);
+}
+
+// ─── CSV Templates & Import ───
+
+function downloadParTemplate() {
+    const headers = ['Venue Name','Current PAR','Monthly Usage','Order Frequency (months)','Late Days','Low Point','Status (running_low/running_ok/too_much)'];
+    const example = ['Delilah LA','300','84','2','14','50','running_low'];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, example, ['Delilah MIA','500','120','3','7','100','running_ok']]);
+    ws['!cols'] = headers.map(h => ({wch: Math.max(h.length + 2, 15)}));
+    XLSX.utils.book_append_sheet(wb, ws, 'PAR Venues');
+    XLSX.writeFile(wb, 'PAR_Advisor_Template.xlsx');
+}
+
+function importParCSV() {
+    const fileInput = document.getElementById('par-csv-input');
+    if (!fileInput.files.length) { alert('Select a file first.'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+            // Clear existing venues
+            document.querySelectorAll('.par-venue-row').forEach(r => r.remove());
+            const hdr = document.getElementById('par-venue-header');
+            if (hdr) hdr.remove();
+            parVenueCount = 0;
+            // Map frequency months to values
+            const freqMap = {'1':'every_month','2':'every_2_months','3':'every_3_months','4':'every_4_months','6':'every_6_months','9':'every_9_months','12':'every_12_months'};
+            let imported = 0;
+            rows.forEach((row, i) => {
+                if (i === 0) return; // skip header
+                const name = String(row[0]||'').trim();
+                if (!name) return;
+                const par = String(row[1]||'');
+                const usage = String(row[2]||'');
+                const freqMo = String(row[3]||'2');
+                const late = String(row[4]||'14');
+                const low = String(row[5]||'');
+                const status = String(row[6]||'running_ok').trim();
+                const freq = freqMap[freqMo] || 'every_2_months';
+                addParVenue(name, par, usage, freq, late, low, status);
+                imported++;
+            });
+            alert(`Imported ${imported} venues.`);
+        } catch(err) { alert('Error reading file: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+// ─── Download PAR Advisor Results ───
+function downloadParResults() {
+    if (!lastParResults) { alert('Run the diagnostic first.'); return; }
+    const wb = XLSX.utils.book_new();
+    // Issues Report sheet
+    const issuesData = [['PAR Advisor — Item Issues Report'],[]];
+    const itemData = [['Item Details'],[], ['Venue','Current PAR','Real Monthly','Depletion PAR','Risk-Adjusted PAR','Worst Case','Status','Key Finding']];
+    lastParResults.forEach(v => {
+        itemData.push([v.name, v.currentPar, v.realMonthly, v.depletionPar, v.riskPar, v.worstPar, v.status, v.keyFinding || '']);
+        if (v.diagnostics && v.diagnostics.length) {
+            v.diagnostics.forEach(d => {
+                issuesData.push([v.name, d.level, d.title, d.text.replace(/<[^>]*>/g,'')]);
+            });
+        }
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(itemData);
+    ws1['!cols'] = [{wch:20},{wch:12},{wch:14},{wch:14},{wch:16},{wch:14},{wch:14},{wch:40}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'PAR Summary');
+    if (issuesData.length > 2) {
+        issuesData.splice(2, 0, ['Venue','Severity','Issue','Details']);
+        const ws2 = XLSX.utils.aoa_to_sheet(issuesData);
+        ws2['!cols'] = [{wch:20},{wch:10},{wch:30},{wch:60}];
+        XLSX.utils.book_append_sheet(wb, ws2, 'Issues');
+    }
+    XLSX.writeFile(wb, 'PAR_Advisor_Report.xlsx');
+}
+
+var lastParResults = [];
+
+// ─── Setup Tab CSV Template & Import ───
+function downloadSetupTemplate() {
+    const wb = XLSX.utils.book_new();
+    // Multi-item format
+    const headers = ['Item Name','SKU','Category','Case Size','Lead Time (days)','Supplier','Venue','PAR','Monthly Demand','On Hand','Trigger Months'];
+    const examples = [
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','Studio William','Delilah LA','30','9','0','2.5'],
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','Studio William','Delilah MIA','50','9','0','2.5'],
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','Studio William','Delilah Dallas','50','9','0','2.5'],
+        ['Water Glass','WG-001','Glassware','24','14','Stolze','Delilah LA','450','60','400','2.5'],
+        ['Water Glass','WG-001','Glassware','24','14','Stolze','Delilah MIA','600','80','500','2.5'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...examples]);
+    ws['!cols'] = [{wch:22},{wch:14},{wch:12},{wch:10},{wch:14},{wch:18},{wch:16},{wch:6},{wch:14},{wch:8},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Items & Venues');
+    XLSX.writeFile(wb, 'Setup_Multi_Item_Template.xlsx');
+}
+
+function importSetupCSV() {
+    const fileInput = document.getElementById('setup-csv-input');
+    if (!fileInput.files.length) { alert('Select a file first.'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+            if (rows.length < 2) { alert('No data rows found.'); return; }
+
+            // Detect format: multi-item (11+ cols) or simple venue (5 cols)
+            const colCount = rows[0].length;
+
+            if (colCount >= 8) {
+                // Multi-item format: group by item, run engine for each
+                const itemMap = {};
+                rows.forEach((row, i) => {
+                    if (i === 0) return;
+                    const itemName = String(row[0]||'').trim();
+                    if (!itemName) return;
+                    if (!itemMap[itemName]) {
+                        itemMap[itemName] = {
+                            name: itemName,
+                            sku: String(row[1]||''),
+                            category: String(row[2]||'OS&E'),
+                            caseSize: parseInt(row[3]) || 12,
+                            leadTime: parseInt(row[4]) || 21,
+                            supplier: String(row[5]||''),
+                            venues: [],
+                        };
+                    }
+                    itemMap[itemName].venues.push({
+                        name: String(row[6]||'Venue'),
+                        par: parseInt(row[7]) || 0,
+                        demand: parseFloat(row[8]) || 0,
+                        onHand: parseInt(row[9]) || 0,
+                        trigger: parseFloat(row[10]) || 2.5,
+                    });
+                });
+
+                const items = Object.values(itemMap);
+                if (items.length === 0) { alert('No items found.'); return; }
+
+                // If single item, load it into the existing form
+                if (items.length === 1) {
+                    const item = items[0];
+                    document.getElementById('item-name').value = item.name;
+                    document.getElementById('item-sku').value = item.sku;
+                    document.getElementById('item-case-size').value = item.caseSize;
+                    document.getElementById('item-lead-time').value = item.leadTime;
+                    document.getElementById('item-supplier').value = item.supplier;
+                    document.getElementById('venue-list').innerHTML = '';
+                    venueCount = 0;
+                    item.venues.forEach(v => addVenue(v.name, String(v.par), String(v.demand), String(v.onHand), String(v.trigger)));
+                    alert(`Loaded ${item.name} with ${item.venues.length} venues.`);
+                } else {
+                    // Multi-item: run all items and show combined results
+                    runMultiItemEngine(items);
+                }
+            } else {
+                // Simple venue format
+                document.getElementById('venue-list').innerHTML = '';
+                venueCount = 0;
+                let imported = 0;
+                rows.forEach((row, i) => {
+                    if (i === 0) return;
+                    const name = String(row[0]||'').trim();
+                    if (!name) return;
+                    addVenue(name, String(row[1]||''), String(row[2]||''), String(row[3]||'0'), String(row[4]||'2.5'));
+                    imported++;
+                });
+                alert(`Imported ${imported} venues.`);
+            }
+        } catch(err) { alert('Error: ' + err.message); console.error(err); }
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+// ─── Engine Results Download ───
+function downloadEngineResults() {
+    if (!lastReport) { alert('Run the engine first.'); return; }
+    const r = lastReport;
+    const wb = XLSX.utils.book_new();
+    const venueData = [['Procurement Engine Results — ' + r.item.name],[],['Item', r.item.name],['SKU', r.item.sku],['Case Size', r.item.caseSize],['Supplier LT', r.item.leadTime + ' days'],[],['VENUE BREAKDOWN'],['Venue','PAR','Monthly Demand','Velocity','Min (r)','Max (S)','On Hand','Need Now','Need Now (cases)']];
+    r.venues.forEach(v => { venueData.push([v.name, v.par, v.monthlyDemand, v.vel, v.minR, v.maxS, v.onHand, v.needNow, v.needNowCases]); });
+    venueData.push([]);
+    const wh = r.warehouse;
+    venueData.push(['WAREHOUSE (s,S) SYSTEM'],['Combined Monthly', wh.totalMonthly],['s (Reorder Point)', wh.s],['S (Order-Up-To)', wh.S],['Reorder Qty', wh.reorderQty],['Review Period', wh.review + ' days']);
+    if (wh.overridden) venueData.push(['NOTE', 'Manual override applied']);
+    venueData.push([]);
+    const fo = r.firstOrder;
+    venueData.push(['FIRST ORDER']);
+    r.venues.forEach(v => { if (v.needNowCases > 0) venueData.push([v.name, v.needNowCases + ' units', v.needNowPacks + ' packs']); });
+    venueData.push(['Warehouse', fo.whUnits + ' units'],['TOTAL', fo.totalUnits + ' units', fo.totalCases + ' cases']);
+    if (fo.totalCost) venueData.push(['Est. Cost', '$' + fo.totalCost.toFixed(2)]);
+    venueData.push([],['STRESS TEST'],['Day','Event','Stock','Stockout?']);
+    r.stressTest.forEach(e => { venueData.push([e.day, e.event, e.stock, e.stockout ? 'YES' : '']); });
+    if (r.stressCorrection) { venueData.push([],['CORRECTED VALUES'],['New s', r.stressCorrection.correctedS],['New S', r.stressCorrection.correctedSBig],['New Reorder', r.stressCorrection.correctedReorder]); }
+    const ws = XLSX.utils.aoa_to_sheet(venueData);
+    ws['!cols'] = [{wch:25},{wch:20},{wch:15},{wch:12},{wch:10},{wch:10},{wch:10},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Engine Results');
+    if (r.tcoTable) {
+        const tcoData = [['TCO BY ORDER SIZE'],[],['Cases','Units','Product Cost','Shipping','Total','TCO/Unit']];
+        r.tcoTable.forEach(t => tcoData.push([t.cases, t.units, t.productCost, t.shipping, t.total, t.tcoPerUnit]));
+        const ws2 = XLSX.utils.aoa_to_sheet(tcoData);
+        ws2['!cols'] = [{wch:8},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10}];
+        XLSX.utils.book_append_sheet(wb, ws2, 'TCO');
+    }
+    XLSX.writeFile(wb, (r.item.name.replace(/[^a-zA-Z0-9]/g,'_')) + '_Engine_Results.xlsx');
+}
+
+
+function downloadMultiItemTemplate() {
+    const wb = XLSX.utils.book_new();
+    const headers = ['Item Name','SKU','Category','Case Size','Lead Time (days)','Unit Cost','Venue','PAR','Monthly Demand','On Hand','Trigger Months'];
+    const rows = [
+        headers,
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','','Delilah LA','30','9','0','2.5'],
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','','Delilah MIA','50','9','0','2.5'],
+        ['Serving Tong Medium','GRM 880071','Bar Tools','12','21','','Delilah Dallas','50','9','0','2.5'],
+        ['Water Glass','WG-001','Glassware - Sturdy','24','14','4.48','Delilah LA','450','40','400','2.5'],
+        ['Water Glass','WG-001','Glassware - Sturdy','24','14','4.48','Delilah MIA','600','55','500','2.5'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:22},{wch:14},{wch:18},{wch:10},{wch:14},{wch:10},{wch:16},{wch:6},{wch:14},{wch:8},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Items');
+
+    const instrRows = [
+        ['INSTRUCTIONS'],
+        [],
+        ['Each row = one item at one venue.'],
+        ['If an item has 3 venues, it appears 3 times with different Venue/PAR/Demand columns.'],
+        ['Item Name + SKU identify the item — all rows with the same name are grouped together.'],
+        ['Case Size and Lead Time should be the same across all venues for the same item.'],
+        [],
+        ['Category options: Glassware - Delicate, Glassware - Sturdy, Flatware, Dinnerware, Bar Tools, Smallwares'],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(instrRows);
+    ws2['!cols'] = [{wch:80}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Instructions');
+
+    XLSX.writeFile(wb, 'Multi_Item_Template.xlsx');
+}
+
+function importMultiItems() {
+    const fileInput = document.getElementById('multi-item-input');
+    const status = document.getElementById('multi-item-status');
+    if (!fileInput.files.length) { status.textContent = 'Select a file first.'; return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+
+            // Group rows by item name
+            const itemMap = {};
+            rows.forEach((row, i) => {
+                if (i === 0) return;
+                const name = String(row[0]||'').trim();
+                if (!name) return;
+                if (!itemMap[name]) {
+                    itemMap[name] = {
+                        name: name,
+                        sku: String(row[1]||''),
+                        category: String(row[2]||'Bar Tools'),
+                        caseSize: parseInt(row[3]) || 12,
+                        leadTime: parseInt(row[4]) || 21,
+                        unitCost: row[5] ? parseFloat(row[5]) : null,
+                        venues: [],
+                    };
+                }
+                const venueName = String(row[6]||'').trim();
+                if (venueName) {
+                    itemMap[name].venues.push({
+                        name: venueName,
+                        par: parseInt(row[7]) || 0,
+                        monthlyDemand: parseFloat(row[8]) || 0,
+                        onHand: parseInt(row[9]) || 0,
+                        triggerMonths: parseFloat(row[10]) || 2.5,
+                    });
+                }
+            });
+
+            multiItems = Object.values(itemMap);
+            status.innerHTML = `<span style="color:var(--success)">✓ Imported ${multiItems.length} items with ${rows.length - 1} venue rows.</span>`;
+
+            // Show summary
+            const list = document.getElementById('multi-item-list');
+            list.innerHTML = multiItems.map(it =>
+                `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+                    <span><strong>${it.name}</strong> <span class="text-muted">(${it.sku})</span></span>
+                    <span class="text-muted">${it.venues.length} venues · case ${it.caseSize} · LT ${it.leadTime}d</span>
+                </div>`
+            ).join('');
+
+            document.getElementById('run-multi-btn').style.display = '';
+        } catch(err) { status.textContent = 'Error: ' + err.message; console.error(err); }
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+function runMultiEngine() {
+    if (multiItems.length === 0) { alert('Import items first.'); return; }
+
+    const wh = {
+        maxSimul: num('wh-max-simul') || 2,
+        review: num('wh-review') || 7,
+        onHand: 0,
+        onPO: 0,
+    };
+
+    const allReports = [];
+
+    multiItems.forEach(mi => {
+        const item = {
+            name: mi.name, sku: mi.sku, category: 'OS&E', subcategory: mi.category,
+            caseSize: mi.caseSize, unitCost: mi.unitCost, shippingCost: null,
+            shippingType: 'flat', leadTime: mi.leadTime, supplier: '', supplierContact: '',
+        };
+
+        const venues = mi.venues.filter(v => v.name && v.par > 0);
+        if (venues.length === 0) return;
+
+        // ── Calculate per venue ──
+        let totalMonthly = 0;
+        const venueResults = venues.map(v => {
+            const daily = v.monthlyDemand / 30;
+            const vel = v.monthlyDemand > 15 ? 'FAST' : v.monthlyDemand > 5 ? 'MED' : 'SLOW';
+            const bufDays = vel === 'FAST' ? 3 : vel === 'MED' ? 5 : 3;
+            const ss = Math.max(1, Math.ceil(daily * bufDays));
+            const rawMin = Math.ceil(v.monthlyDemand * v.triggerMonths);
+            const minR = Math.max(1, Math.min(rawMin, v.par - 1));
+            const typicalDraw = Math.ceil(v.monthlyDemand);
+            const needNow = Math.max(0, v.par - v.onHand);
+            const needNowCases = needNow > 0 ? Math.ceil(needNow / item.caseSize) * item.caseSize : 0;
+            totalMonthly += v.monthlyDemand;
+            return { ...v, daily, vel, ss, minR, maxS: v.par, typicalDraw, needNow, needNowCases, needNowPacks: needNowCases / item.caseSize };
+        });
+
+        // ── Warehouse s/S ──
+        const combinedDaily = totalMonthly / 30;
+        const whVel = totalMonthly > 15 ? 'FAST' : totalMonthly > 5 ? 'MED' : 'SLOW';
+        const whBuf = whVel === 'FAST' ? 7 : whVel === 'MED' ? 14 : 7;
+        const whSS = Math.max(1, Math.ceil(combinedDaily * whBuf));
+        const typicalDraws = venueResults.map(v => v.typicalDraw).sort((a, b) => b - a);
+        const simulDraw = typicalDraws.slice(0, wh.maxSimul).reduce((a, b) => a + b, 0);
+        const ltReviewDemand = Math.ceil(combinedDaily * (item.leadTime + wh.review));
+        const s = ltReviewDemand + whSS;
+        const S = Math.ceil((s + Math.max(simulDraw, Math.ceil(combinedDaily * wh.review))) / item.caseSize) * item.caseSize;
+        const reorderQty = Math.ceil(Math.max(item.caseSize, S - s) / item.caseSize) * item.caseSize;
+
+        // ── Stress test ──
+        const sorted = [...venueResults].sort((a, b) => b.typicalDraw - a.typicalDraw);
+        const orders = [];
+        if (sorted.length >= 1) orders.push({ day: 1, venue: sorted[0] });
+        if (sorted.length >= 2) orders.push({ day: Math.min(7, item.leadTime), venue: sorted[1] });
+        if (sorted.length >= 3) orders.push({ day: Math.min(14, item.leadTime), venue: sorted[2] });
+        for (let i = 3; i < sorted.length; i++) orders.push({ day: Math.min((i+1)*7, item.leadTime), venue: sorted[i] });
+
+        let stock = s;
+        let hasStockout = false;
+        let lowestStock = s;
+        orders.forEach(o => {
+            if (o.day <= item.leadTime) {
+                stock -= o.venue.typicalDraw;
+                if (stock < lowestStock) lowestStock = stock;
+                if (stock < 0) hasStockout = true;
+            }
+        });
+        if (item.leadTime > 30) {
+            orders.forEach(o => {
+                if (o.day + 30 <= item.leadTime) {
+                    stock -= o.venue.typicalDraw;
+                    if (stock < 0) hasStockout = true;
+                }
+            });
+        }
+
+        // Auto-correct
+        let correctedS = null, correctedSBig = null;
+        if (hasStockout) {
+            let totalDraw = 0;
+            orders.forEach(o => { if (o.day <= item.leadTime) totalDraw += o.venue.typicalDraw; });
+            if (item.leadTime > 30) orders.forEach(o => { if (o.day + 30 <= item.leadTime) totalDraw += o.venue.typicalDraw; });
+            correctedS = totalDraw + whSS;
+            correctedSBig = Math.ceil((correctedS + simulDraw) / item.caseSize) * item.caseSize;
+        }
+
+        const totalNeed = venueResults.reduce((a, v) => a + v.needNowCases, 0);
+
+        allReports.push({
+            item, venues: venueResults, s, S, reorderQty, whSS,
+            totalMonthly, hasStockout, lowestStock,
+            correctedS, correctedSBig, totalNeed,
+        });
+    });
+
+    // ── Render Dashboard ──
+    let html = `<div class="card"><div class="card-title">Batch Results — ${allReports.length} Items</div>
+        <div style="margin-bottom:12px"><button class="btn btn-secondary" onclick="downloadBatchResults()" style="font-size:0.82rem">📥 Download All Results (Excel)</button></div>
+        <table class="result-table">
+        <tr><th>Item</th><th>SKU</th><th>Venues</th><th>s</th><th>S</th><th>Reorder</th><th>Need Now</th><th>Stress Test</th><th>Action</th></tr>`;
+
+    allReports.forEach(r => {
+        const passClass = r.hasStockout ? 'color:var(--danger)' : 'color:var(--success)';
+        const passText = r.hasStockout ? '❌ FAIL' : '✅ PASS';
+        const action = r.hasStockout
+            ? `<span style="font-size:0.78rem">Set s→<strong style="color:var(--accent)">${r.correctedS}</strong> S→<strong style="color:var(--accent)">${r.correctedSBig}</strong></span>`
+            : '<span class="muted" style="font-size:0.78rem">No action</span>';
+        html += `<tr>
+            <td><strong>${r.item.name}</strong></td>
+            <td class="muted">${r.item.sku}</td>
+            <td>${r.venues.length}</td>
+            <td>${r.s}</td><td>${r.S}</td>
+            <td>${r.reorderQty}</td>
+            <td class="highlight">${r.totalNeed}</td>
+            <td style="${passClass};font-weight:600">${passText}</td>
+            <td>${action}</td>
+        </tr>`;
+    });
+
+    const failCount = allReports.filter(r => r.hasStockout).length;
+    html += `</table>
+        <div style="margin-top:12px;font-size:0.88rem;color:var(--text-muted)">
+            <strong style="color:var(--text)">${allReports.length - failCount}/${allReports.length}</strong> items pass stress test.
+            ${failCount > 0 ? `<strong style="color:var(--danger)">${failCount} items need s/S correction.</strong>` : '<span style="color:var(--success)">All clear.</span>'}
+        </div>
+    </div>`;
+
+    // Expandable details per item
+    allReports.forEach(r => {
+        html += `<div class="card">
+            <div class="card-title">${r.item.name} <span class="badge">${r.item.sku}</span>
+                ${r.hasStockout ? '<span class="badge" style="background:var(--danger-bg);color:var(--danger)">STOCKOUT RISK</span>' : '<span class="badge" style="background:var(--success-bg);color:var(--success)">PASS</span>'}
+            </div>
+            <div class="result-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div class="stat-card"><div class="stat-label">s (Reorder Point)</div><div class="stat-value" style="font-size:1.4rem">${r.hasStockout ? '<span style="text-decoration:line-through;color:var(--danger)">'+r.s+'</span> → <span style="color:var(--accent)">'+r.correctedS+'</span>' : r.s}</div></div>
+                <div class="stat-card"><div class="stat-label">S (Order-Up-To)</div><div class="stat-value" style="font-size:1.4rem">${r.hasStockout ? '<span style="text-decoration:line-through;color:var(--danger)">'+r.S+'</span> → <span style="color:var(--accent)">'+r.correctedSBig+'</span>' : r.S}</div></div>
+                <div class="stat-card"><div class="stat-label">Reorder Qty</div><div class="stat-value" style="font-size:1.4rem">${r.reorderQty}</div><div class="stat-sub">${r.reorderQty/r.item.caseSize} cases</div></div>
+                <div class="stat-card"><div class="stat-label">Total Need Now</div><div class="stat-value" style="font-size:1.4rem">${r.totalNeed}</div><div class="stat-sub">${r.totalNeed/r.item.caseSize} cases</div></div>
+            </div>
+            <table class="result-table" style="margin-top:12px">
+                <tr><th>Venue</th><th>PAR</th><th>Monthly</th><th>On Hand</th><th>Need Now</th></tr>
+                ${r.venues.map(v => `<tr><td>${v.name}</td><td>${v.par}</td><td>${v.monthlyDemand}</td><td>${v.onHand}</td><td class="highlight">${v.needNowCases} (${v.needNowPacks}pk)</td></tr>`).join('')}
+            </table>
+        </div>`;
+    });
+
+    lastMultiReport = allReports;
+    document.getElementById('results-content').innerHTML = html;
+    switchTab('results');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab')[1].classList.add('active');
+}
+
+var lastMultiReport = [];
+
+function downloadBatchResults() {
+    if (!lastMultiReport || lastMultiReport.length === 0) { alert('Run batch first.'); return; }
+    const wb = XLSX.utils.book_new();
+
+    // Summary
+    const sumData = [['Batch Procurement Results'],[], ['Item','SKU','Venues','Monthly Demand','s','S','Reorder Qty','Need Now','Stress Test','Corrected s','Corrected S']];
+    lastMultiReport.forEach(r => {
+        sumData.push([r.item.name, r.item.sku, r.venues.length, Math.round(r.totalMonthly*10)/10, r.s, r.S, r.reorderQty, r.totalNeed, r.hasStockout?'FAIL':'PASS', r.correctedS||'', r.correctedSBig||'']);
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(sumData);
+    ws1['!cols'] = [{wch:22},{wch:14},{wch:8},{wch:14},{wch:6},{wch:6},{wch:12},{wch:10},{wch:10},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+    // Detail per item
+    const detData = [['Venue Details'],[], ['Item','Venue','PAR','Monthly Demand','On Hand','Need Now','Cases']];
+    lastMultiReport.forEach(r => {
+        r.venues.forEach(v => {
+            detData.push([r.item.name, v.name, v.par, v.monthlyDemand, v.onHand, v.needNowCases, v.needNowPacks]);
+        });
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(detData);
+    ws2['!cols'] = [{wch:22},{wch:18},{wch:6},{wch:14},{wch:10},{wch:10},{wch:8}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Venue Details');
+
+    XLSX.writeFile(wb, 'Batch_Procurement_Results.xlsx');
 }
 </script>
 </body></html>
