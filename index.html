@@ -1203,7 +1203,9 @@ function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
-    event.target.classList.add('active');
+    if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
+        event.target.classList.add('active');
+    }
 }
 
 // ─── Engine Constants ───
@@ -1499,6 +1501,30 @@ function renderResults() {
         </div>
     </div>`;
 
+    // ── How It Works — Plain English Explainer ──
+    html += `<div class="card" style="border-left:3px solid var(--accent)">
+        <div class="card-title">How The Ordering Works</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div style="background:var(--surface-2);border-radius:10px;padding:18px">
+                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Loop 1: Venue → Warehouse (1-day delivery)</div>
+                ${r.venues.map(v => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.88rem">
+                    <strong>${v.name}</strong><br>
+                    <span class="text-muted">When stock drops to</span> <strong style="color:var(--accent)">${v.minR}</strong> <span class="text-muted">→ order from warehouse → restock to</span> <strong style="color:var(--accent)">${v.maxS}</strong> <span class="text-muted">(${v.maxS - v.minR} units)</span>
+                </div>`).join('')}
+                <div style="margin-top:10px;font-size:0.82rem;color:var(--text-muted)">Warehouse delivers to venues in <strong style="color:var(--text)">1 day</strong>. Venues don't wait for suppliers.</div>
+            </div>
+            <div style="background:var(--surface-2);border-radius:10px;padding:18px">
+                <div style="font-size:0.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Loop 2: Warehouse → Supplier (${r.item.leadTime}-day delivery)</div>
+                <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.88rem">
+                    <span class="text-muted">Every</span> <strong style="color:var(--text)">${wh.review} days</strong><span class="text-muted">, check warehouse stock.</span><br>
+                    <span class="text-muted">If stock ≤</span> <strong style="color:var(--accent)">${wh.s}</strong> <span class="text-muted">→ order</span> <strong style="color:var(--accent)">${wh.reorderQty}</strong> <span class="text-muted">from supplier (${wh.reorderQtyCases} cases).</span><br>
+                    <span class="text-muted">Stock goes back up to</span> <strong style="color:var(--accent)">${wh.S}</strong><span class="text-muted">.</span>
+                </div>
+                <div style="margin-top:10px;font-size:0.82rem;color:var(--text-muted)">Supplier delivers in <strong style="color:var(--text)">${r.item.leadTime} days</strong>. The warehouse absorbs this wait time so venues never run out.</div>
+            </div>
+        </div>
+    </div>`;
+
     // Venue breakdown
     html += `<div class="card">
         <div class="card-title">Venue Breakdown</div>
@@ -1665,10 +1691,12 @@ function renderOrders() {
 }
 
 // ─── Helpers ───
-function val(id) { return document.getElementById(id).value.trim(); }
-function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function num(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
 function numOrNull(id) {
-    const v = document.getElementById(id).value.trim();
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const v = el.value.trim();
     return v === '' ? null : parseFloat(v);
 }
 
@@ -1774,7 +1802,8 @@ function runParAdvisor() {
 
         // ── Depletion PAR: consumption over real cycle + floor stock ──
         const cycleConsumption = Math.ceil(daily * realCycleDays);
-        const depletionPar = roundToCase(cycleConsumption + floorStock, caseSize);
+        const rawDepletion = cycleConsumption + floorStock;
+        const depletionPar = roundToCase(rawDepletion, caseSize);
 
         // ── Risk-adjusted PAR (VENUE risks only) ──
         let weightedRiskDays = 0;
@@ -1785,7 +1814,8 @@ function runParAdvisor() {
             riskBreakdown.push({ ...r, units: Math.ceil(daily * r.days), weighted });
         });
         const riskBuffer = Math.ceil(weightedRiskDays);
-        const riskPar = roundToCase(cycleConsumption + floorStock + riskBuffer, caseSize);
+        const rawRisk = cycleConsumption + floorStock + riskBuffer;
+        const riskPar = roundToCase(rawRisk, caseSize);
 
         // ── Warehouse risk buffer (display only — goes into warehouse s/S) ──
         let whWeightedDays = 0;
@@ -1799,7 +1829,8 @@ function runParAdvisor() {
 
         // ── Worst case PAR (venue risks at 100%) ──
         const worstRiskUnits = venueRisks.reduce((sum, r) => sum + Math.ceil(daily * r.days), 0);
-        const worstPar = roundToCase(cycleConsumption + floorStock + worstRiskUnits, caseSize);
+        const rawWorst = cycleConsumption + floorStock + worstRiskUnits;
+        const worstPar = roundToCase(rawWorst, caseSize);
 
         // ── What-if: monthly ordering ──
         const monthlyConsumption = Math.ceil(daily * 30);
@@ -1968,19 +1999,24 @@ function runParAdvisor() {
             <div class="scenario-card depletion">
                 <div class="scenario-label">Depletion PAR</div>
                 <div class="scenario-value">${depletionPar}</div>
-                <div class="scenario-sub">${depletionDays} days · no risk buffer</div>
+                <div class="scenario-sub">${depletionDays} days · raw: ${rawDepletion}</div>
             </div>
             <div class="scenario-card risk">
                 <div class="scenario-label">Risk-Adjusted PAR</div>
                 <div class="scenario-value">${riskPar}</div>
-                <div class="scenario-sub">${riskDays} days · recommended</div>
+                <div class="scenario-sub">${riskDays} days · raw: ${rawRisk} (+${riskBuffer} buffer)</div>
             </div>
             <div class="scenario-card worst">
                 <div class="scenario-label">Worst Case PAR</div>
                 <div class="scenario-value">${worstPar}</div>
-                <div class="scenario-sub">Everything goes wrong</div>
+                <div class="scenario-sub">raw: ${rawWorst} (+${worstRiskUnits} buffer)</div>
             </div>
         </div>`;
+        if (depletionPar === riskPar && riskPar === worstPar) {
+            html += `<div style="padding:8px 14px;background:var(--warn-bg);border:1px solid rgba(255,152,0,0.2);border-radius:6px;margin-bottom:12px;font-size:0.82rem;color:var(--warn)">
+                ⚠️ All three PARs are identical due to case rounding (case size: ${caseSize}). Raw values differ: ${rawDepletion} → ${rawRisk} → ${rawWorst}. The risk buffer of ${riskBuffer} units exists but is absorbed by rounding to the next full case.
+            </div>`;
+        }
 
         // ── Simulation Verification: prove the suggested PAR survives 3 cycles ──
         let simStock = riskPar;
@@ -2021,11 +2057,12 @@ function runParAdvisor() {
         const recommendedPar = Math.max(riskPar, verifiedPar);
         if (v.currentPar > 0) {
             const diff = recommendedPar - v.currentPar;
+            const pctDiff = Math.abs(diff) / v.currentPar * 100;
             const diffText = diff > 0
                 ? `<span style="color:var(--danger)">Increase by ${diff} units (${Math.ceil(diff/caseSize)} cases)</span>`
-                : diff < -caseSize
-                    ? `<span style="color:var(--success)">Can reduce by ${Math.abs(diff)} units (${Math.floor(Math.abs(diff)/caseSize)} cases)</span>`
-                    : `<span style="color:var(--success)">Current PAR is appropriate</span>`;
+                : pctDiff > 10
+                    ? `<span style="color:var(--success)">Can reduce by ${Math.abs(diff)} units (${Math.floor(Math.abs(diff)/caseSize)} cases) — ${Math.round(pctDiff)}% overstocked</span>`
+                    : `<span style="color:var(--success)">Current PAR is appropriate (within 10%)</span>`;
 
             html += `<div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:0.9rem">
                 Current PAR: <strong>${v.currentPar}</strong> → Recommended: <strong style="color:var(--accent)">${recommendedPar}</strong> · ${diffText}
@@ -3116,6 +3153,8 @@ function runMultiEngine() {
 
     // Expandable details per item
     allReports.forEach(r => {
+        const useS = r.hasStockout ? r.correctedS : r.s;
+        const useSBig = r.hasStockout ? r.correctedSBig : r.S;
         html += `<div class="card">
             <div class="card-title">${r.item.name} <span class="badge">${r.item.sku}</span>
                 ${r.hasStockout ? '<span class="badge" style="background:var(--danger-bg);color:var(--danger)">STOCKOUT RISK</span>' : '<span class="badge" style="background:var(--success-bg);color:var(--success)">PASS</span>'}
@@ -3125,6 +3164,16 @@ function runMultiEngine() {
                 <div class="stat-card"><div class="stat-label">S (Order-Up-To)</div><div class="stat-value" style="font-size:1.4rem">${r.hasStockout ? '<span style="text-decoration:line-through;color:var(--danger)">'+r.S+'</span> → <span style="color:var(--accent)">'+r.correctedSBig+'</span>' : r.S}</div></div>
                 <div class="stat-card"><div class="stat-label">Reorder Qty</div><div class="stat-value" style="font-size:1.4rem">${r.reorderQty}</div><div class="stat-sub">${r.reorderQty/r.item.caseSize} cases</div></div>
                 <div class="stat-card"><div class="stat-label">Total Need Now</div><div class="stat-value" style="font-size:1.4rem">${r.totalNeed}</div><div class="stat-sub">${r.totalNeed/r.item.caseSize} cases</div></div>
+            </div>
+            <div style="background:var(--surface-2);border-radius:8px;padding:14px;margin:12px 0;font-size:0.85rem;border-left:3px solid var(--accent)">
+                <div style="font-size:0.72rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Ordering Rules</div>
+                ${r.venues.map(v => {
+                    const minR = Math.max(1, Math.min(Math.ceil(v.monthlyDemand * 2.5), v.par - 1));
+                    return `<div style="margin-bottom:4px"><strong>${v.name}:</strong> <span class="text-muted">When stock drops to</span> <strong style="color:var(--accent)">${minR}</strong> <span class="text-muted">→ order from warehouse → restock to</span> <strong style="color:var(--accent)">${v.par}</strong> <span class="text-muted">(+${v.par - minR} units)</span></div>`;
+                }).join('')}
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+                    <strong>Warehouse:</strong> <span class="text-muted">Every ${wh.review}d, if stock ≤</span> <strong style="color:var(--accent)">${useS}</strong> <span class="text-muted">→ order</span> <strong style="color:var(--accent)">${r.reorderQty}</strong> <span class="text-muted">from supplier → stock up to</span> <strong style="color:var(--accent)">${useSBig}</strong>
+                </div>
             </div>
             <table class="result-table" style="margin-top:12px">
                 <tr><th>Venue</th><th>PAR</th><th>Monthly</th><th>On Hand</th><th>Need Now</th></tr>
@@ -3176,32 +3225,78 @@ function pushParToSetup() {
         return;
     }
 
-    // Use first item's config for Setup tab item details
-    const first = lastParResults[0];
-    const itemName = document.getElementById('item-name');
-    if (!itemName.value) itemName.value = first.itemName || 'Item from PAR Advisor';
-    document.getElementById('item-case-size').value = first.caseSize || 12;
-    document.getElementById('item-lead-time').value = first.leadTime || 21;
+    // Detect how many unique items are in the results
+    const uniqueItems = [...new Set(lastParResults.map(v => v.itemName || v.name))];
 
-    // Clear existing venues and add from PAR results
-    document.getElementById('venue-list').innerHTML = '';
-    venueCount = 0;
+    if (uniqueItems.length === 1) {
+        // ── Single item → fill Setup tab directly ──
+        const first = lastParResults[0];
+        document.getElementById('item-name').value = first.itemName || 'Item from PAR Advisor';
+        document.getElementById('item-case-size').value = first.caseSize || 12;
+        document.getElementById('item-lead-time').value = first.leadTime || 21;
 
-    lastParResults.forEach(v => {
-        const par = v.recommendedPar || v.riskPar || v.currentPar;
-        const demand = v.realMonthly || 0;
-        const displayName = v.venueName || v.name;
-        addVenue(displayName, String(par), String(demand), '0', '2.5');
-    });
+        document.getElementById('venue-list').innerHTML = '';
+        venueCount = 0;
 
-    // Switch to Setup tab
-    switchTab('input');
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab')[0].classList.add('active');
+        lastParResults.forEach(v => {
+            const par = v.recommendedPar || v.riskPar || v.currentPar;
+            const demand = v.realMonthly || 0;
+            const displayName = v.venueName || v.name;
+            addVenue(displayName, String(par), String(demand), '0', '2.5');
+        });
 
-    // Scroll to top and show notification
-    window.scrollTo(0, 0);
-    alert(`Pushed ${lastParResults.length} venue(s) with recommended PARs to Setup.\n\nVenues loaded with simulation-verified PARs. Click "Run Procurement Engine" to stress test the warehouse s/S levels for these PARs.`);
+        switchTab('input');
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        window.scrollTo(0, 0);
+        alert(`Pushed ${lastParResults.length} venue(s) for "${first.itemName}" to Setup.\n\nClick "Run Procurement Engine" to stress test.`);
+
+    } else {
+        // ── Multiple items → build multi-item data and run batch engine ──
+        const itemMap = {};
+        lastParResults.forEach(v => {
+            const key = v.itemName || v.name;
+            if (!itemMap[key]) {
+                itemMap[key] = {
+                    name: key,
+                    sku: '',
+                    category: v.category || 'Bar Tools',
+                    caseSize: v.caseSize || 12,
+                    leadTime: v.leadTime || 21,
+                    unitCost: null,
+                    venues: [],
+                };
+            }
+            itemMap[key].venues.push({
+                name: v.venueName || v.name,
+                par: v.recommendedPar || v.riskPar || v.currentPar,
+                monthlyDemand: v.realMonthly || 0,
+                onHand: 0,
+                triggerMonths: 2.5,
+            });
+        });
+
+        multiItems = Object.values(itemMap);
+
+        // Show summary in the multi-item list
+        const list = document.getElementById('multi-item-list');
+        list.innerHTML = multiItems.map(it =>
+            `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+                <span><strong>${it.name}</strong> <span class="text-muted">(${it.category})</span></span>
+                <span class="text-muted">${it.venues.length} venues · case ${it.caseSize} · LT ${it.leadTime}d · PARs: ${it.venues.map(v=>v.par).join(', ')}</span>
+            </div>`
+        ).join('');
+
+        const status = document.getElementById('multi-item-status');
+        status.innerHTML = `<span style="color:var(--success)">✓ Loaded ${multiItems.length} items with recommended PARs from PAR Advisor.</span>`;
+        document.getElementById('run-multi-btn').style.display = '';
+
+        switchTab('input');
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        window.scrollTo(0, document.getElementById('multi-item-list').offsetTop - 100);
+        alert(`Pushed ${uniqueItems.length} items (${lastParResults.length} venue rows) to Multi-Item Setup.\n\nItems: ${uniqueItems.join(', ')}\n\nClick "Run All Items (Batch)" to stress test all items simultaneously.`);
+    }
 }
 </script>
 </body></html>
