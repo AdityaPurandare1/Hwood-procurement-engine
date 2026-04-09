@@ -2643,7 +2643,7 @@ function runNewPar() {
         const isOverride = i.override !== null;
         const rp = Math.ceil(finalPar * i.attrition);
         tS+=sg; tF+=finalPar; tR+=rp;
-        exportData.push({name:i.name, category:i.category, type:i.type, lgQty:i.lgQty, smQty:i.smQty, threePar:tp, peakBuf:pb, suggested:sg, override:i.override, finalPar, repl:rp});
+        exportData.push({name:i.name, category:i.category, type:i.type, lgQty:i.lgQty, smQty:i.smQty, threePar:tp, peakBuf:pb, suggested:sg, override:i.override, finalPar, repl:rp, courseMult:i.courseMult, replacePC: i.courseMult > 1 ? 'Yes' : 'No'});
 
         const overrideCell = isOverride ? `<strong style="color:var(--warn)">${i.override}</strong>` : '<span class="muted">—</span>';
         const finalStyle = isOverride ? 'background:rgba(255,152,0,0.1);color:var(--warn)' : 'color:var(--accent)';
@@ -2658,7 +2658,7 @@ function runNewPar() {
     const totalColspan = serviceStyle==='multi' ? 4 : 3;
     h+=`<tr style="border-top:2px solid var(--border-light)"><td colspan="${totalColspan}"><strong>TOTALS</strong></td><td style="text-align:center"><strong>${tS}</strong></td><td></td><td style="text-align:center" class="highlight"><strong>${tF}</strong></td><td class="muted"><strong>${tR}</strong></td></tr></table></div>`;
 
-    lastNewParResults = {venueName:vn, cuisine:cn, seats, tables, covers, items: exportData};
+    lastNewParResults = {venueName:vn, cuisine:cn, seats, tables, covers, serviceStyle, avgCourses, items: exportData};
     document.getElementById('newpar-results').innerHTML=h;
 }
 
@@ -2667,8 +2667,8 @@ function exportToExcel() {
     if (!lastNewParResults) { alert('Run the calculation first.'); return; }
     const r = lastNewParResults;
     const wb = XLSX.utils.book_new();
+    const isMulti = r.serviceStyle === 'multi';
 
-    // Summary sheet
     const summaryData = [
         ['THE h.wood GROUP — PAR Setup Report'],
         [],
@@ -2677,9 +2677,11 @@ function exportToExcel() {
         ['Seats', r.seats],
         ['Tables', r.tables],
         ['Covers/Night', r.covers],
+        ['Service Style', isMulti ? 'Multi-Course Replace' : 'Single Course'],
+        isMulti ? ['Avg Courses/Guest', r.avgCourses] : [],
         [],
-        ['Item', 'Category', 'Type', 'Lg Tbl', 'Sm Tbl', 'Three-PAR', 'Peak+Buf', 'Suggested', 'Override', 'Final PAR', 'Monthly Repl.'],
-    ];
+        ['Item', 'Category', 'Type', 'Lg Tbl', 'Sm Tbl', 'Replace/Course', '×Courses', 'Three-PAR', 'Peak+Buf', 'Suggested', 'Override', 'Final PAR', 'Monthly Repl.'],
+    ].filter(r => r.length > 0);
 
     let currentCat = '';
     let catTotals = {};
@@ -2687,9 +2689,9 @@ function exportToExcel() {
         if (i.category !== currentCat) {
             if (currentCat) summaryData.push([]);
             currentCat = i.category;
-            summaryData.push([currentCat.toUpperCase(), '', '', '', '', '', '', '', '', '', '']);
+            summaryData.push([currentCat.toUpperCase()]);
         }
-        summaryData.push([i.name, i.category, i.type, i.lgQty||'', i.smQty||'', i.threePar||'', i.peakBuf||'', i.suggested||'', i.override!==null?i.override:'', i.finalPar, i.repl]);
+        summaryData.push([i.name, i.category, i.type, i.lgQty||'', i.smQty||'', i.replacePC, i.courseMult > 1 ? '×'+i.courseMult : '—', i.threePar||'', i.peakBuf||'', i.suggested||'', i.override!==null?i.override:'', i.finalPar, i.repl]);
         if (!catTotals[i.category]) catTotals[i.category] = {par:0, repl:0, count:0};
         catTotals[i.category].par += i.finalPar;
         catTotals[i.category].repl += i.repl;
@@ -2699,13 +2701,12 @@ function exportToExcel() {
     summaryData.push([]);
     const totalPar = r.items.reduce((s,i)=>s+i.finalPar,0);
     const totalRepl = r.items.reduce((s,i)=>s+i.repl,0);
-    summaryData.push(['TOTAL', '', '', '', '', '', '', '', '', totalPar, totalRepl]);
+    summaryData.push(['TOTAL', '', '', '', '', '', '', '', '', '', '', totalPar, totalRepl]);
 
     const ws = XLSX.utils.aoa_to_sheet(summaryData);
-    ws['!cols'] = [{wch:30},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12}];
+    ws['!cols'] = [{wch:30},{wch:12},{wch:10},{wch:8},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12}];
     XLSX.utils.book_append_sheet(wb, ws, 'PAR Setup');
 
-    // Category summary sheet
     const catData = [['Category Summary'], [], ['Category', 'Items', 'Total PAR', 'Monthly Replacement']];
     Object.entries(catTotals).forEach(([cat, v]) => catData.push([cat, v.count, v.par, v.repl]));
     catData.push([], ['TOTAL', r.items.length, totalPar, totalRepl]);
